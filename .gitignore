@@ -1,0 +1,16 @@
+# RStudio
+.Rproj.user/
+.Rhistory
+.RData
+.Ruserdata
+
+# OS
+.DS_Store
+Thumbs.db
+
+# renv (if used)
+renv/library/
+renv/python/
+
+
+# if you want to keep the data on your computer and do not want to push it to github add it here.
