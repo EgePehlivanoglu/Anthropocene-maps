@@ -43,13 +43,15 @@ names(r_10yr) <- apply(
   function(x) paste0(x[1], "-", x[2])
 )
 
-
 # Different Cut offs
 ## Exceeding 2 -keep this one
 
 # Reproject the raster to Mollweide projection
 mollweide_crs <- "+proj=moll +lon_0=0 +x_0=0 +y_0=0 +ellps=WGS84 +datum=WGS84 +units=m +no_defs"
 r_moll <- project(r_10yr[[nlyr(r_10yr)]], mollweide_crs)
+
+# r_10yr[[nlyr(r_10yr)]] 
+# note that it is updated now it spans 2017-2026 and hence the middle of russia is blank.
 
 # Create a mask for values greater than 2
 r_anomaly <- clamp(r_moll, lower = 2, value = FALSE)  # Sets values < 2 to NA
@@ -58,17 +60,48 @@ r_anomaly <- clamp(r_moll, lower = 2, value = FALSE)  # Sets values < 2 to NA
 world <- ne_countries(scale = "medium", returnclass = "sf")
 world_vect <- vect(world)
 world_moll <- project(world_vect, mollweide_crs)
-# Create and reverse the "Heat 2" color palette
-heat2_pal <- hcl.colors(100, "Heat 2")
-reversed_heat2 <- rev(heat2_pal)  # Reverse the color order
-#pdf(file = "Areas_withanomalybiggerthan2.pdf")
-# Plot only the areas with anomaly > 2
-plot(r_anomaly, 
-     col = reversed_heat2,  # Using red colors for emphasis
-     main = "Areas with Anomaly > 2 (2016-2025)", 
-     plg = list(title = "Anomaly Value"),
-     axes = FALSE)
 
-# Add land borders for reference
-plot(world_moll, add = TRUE, col = NA, border = "black", lwd = 0.1)
-#dev.off()
+
+# 6) convert spatraster to a dataframe ---------
+
+# # Make a full cell-by-cell dataframe (includes NA cells)
+# df <- as.data.frame(r_anomaly, xy = TRUE, na.rm = TRUE) # this is if you wanted to exclude the NA cells
+
+# The value column name is the layer name: "2017-2026"
+val_col <- names(r_anomaly)[1]
+# Create a mask for values greater than 2
+r_anomaly <- clamp(r_moll, lower = 2, value = FALSE)  # Sets values < 2 to NA
+df <- as.data.frame(r_anomaly, xy = TRUE, na.rm = FALSE)  # columns: x, y, value #### important that na.rm is false so it keeps NAs too.
+df_bin <- df %>%
+  mutate(
+    bin = if_else(!is.na(.data[[val_col]]), 1L, 0L, missing = NA)
+  )
+df_bin$bin <- as.factor(df_bin$bin)
+
+# ---- target CRS: Mollweide ----
+# Using a standard proj string for world Mollweide
+crs_moll <- "+proj=moll +lon_0=0 +datum=WGS84 +units=m +no_defs"
+# ---- country boundaries -> sf -> Mollweide ----
+world <- ne_countries(scale = "medium", returnclass = "sf")
+world_moll <- st_transform(world, crs = crs_moll)
+
+# 7) plot----------
+bin_climate_change_plot <- ggplot() +
+  geom_tile(data = df_bin, aes(x = x, y = y, fill = factor(bin))) +
+  # optional if you already have it:
+  geom_sf(data = world_moll, fill = NA, color = "black", linewidth = 0.1) +
+  coord_sf(crs = crs_moll, expand = TRUE) +
+  scale_fill_manual(values = c(`0` = "white", `1` = "red"), name = "Data Present") +
+  labs(x = NULL, y = NULL) +
+  theme_minimal() +
+  labs(
+    title = "Areas with Anomaly > 2 Degree Celcius (2017-2026)",
+    subtitle = "Binary Transformed Data with Mollweide Projection",
+    caption = "Years for 2017-2026, if the increase is more than 2 degree Celcius it is shown in red",
+    x = NULL, y = NULL
+  ) 
+
+# save the plot in pdf
+# pdf(file = "binary climate change plot2017-26.pdf")
+# bin_climate_change_plot
+# dev.off()
