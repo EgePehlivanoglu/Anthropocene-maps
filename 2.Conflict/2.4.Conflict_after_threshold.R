@@ -108,25 +108,28 @@ p_50
 # Save df
 conflict_bin_df <- df_bin_no0 %>% select(c("x", "y", "q50_bin"))
 
-rm(list=setdiff(ls(), c("conflict_bin_df")))
+# rm(list=setdiff(ls(), c("conflict_bin_df")))
 
 
 # 4th of February
 # MAKE NAs 0 also ######
 
-ggplot() +
-  geom_tile(data = df_bin_no0, aes(x = x, y = y, fill = q50_bin)) +
+### this is only for visualisation dataset hasn't changed
+df_bin_NAsconverted0 <- df_bin_no0 %>% select(c(x,y, q50_bin)) %>% filter(q50_bin==1)
+
+conflict_binary_single <- ggplot() +
+  geom_tile(data = df_bin_NAsconverted0, aes(x = x, y = y, fill = q50_bin)) +
   geom_sf(data = land_sf, fill = NA, color = "lightgray", linewidth = 0.1) +
   coord_sf(crs = st_crs(crs_moll), expand = FALSE) +
-  scale_fill_manual(values = c("0" = "#F8766D", "1" = "#00BFC4"),  
-                    limits = c("0","1"),        # keep order
+  scale_fill_manual(values = c("1" = "#00BFC4"),  
+                    limits = c("1"),        # keep order
                     drop   = FALSE,             # show both even if one is absent
                     name = "Sum of Deaths",
-                    labels = c("0" = "< threshold", "1" = "≥ threshold")) +
+                    labels = c("1" = "≥ threshold")) +
   labs(
     title = "Organized Violence (sum of estimated deaths)",
     subtitle = sprintf("2000-2024 • %dkm equal-area grid", cell_km),
-    caption = "Projection: Mollweide (equal-area). Values included after 50th percentile."
+    caption = "Projection: Mollweide (equal-area). Values included after 50th percentile.NAs treated as 0"
   ) + 
   xlab("longitude") +
   ylab("latitude") +
@@ -139,3 +142,7 @@ ggplot() +
     legend.title    = element_text(size = 11, face = "bold"),
     legend.text     = element_text(size = 10, face = "bold")
   )
+
+# pdf(file = "q50_bin_NAsconverted0.pdf")
+# conflict_binary_single
+# dev.off()
