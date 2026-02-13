@@ -53,12 +53,6 @@ r_moll <- project(r_10yr[[nlyr(r_10yr)]], mollweide_crs)
 # r_10yr[[nlyr(r_10yr)]] 
 # note that it is updated now it spans 2017-2026 and hence the middle of russia is blank.
 
-# Get world map data
-world <- ne_countries(scale = "medium", returnclass = "sf")
-world_vect <- vect(world)
-world_moll <- project(world_vect, mollweide_crs)
-
-
 # 6) convert spatraster to a dataframe ---------
 
 # Create a mask for values greater than 2
@@ -96,4 +90,48 @@ bin_climate_change_plot <- ggplot() +
 # pdf(file = "binary climate change plot2017-26.pdf")
 # bin_climate_change_plot
 # dev.off()
+
+## TBC. Investigate data --------
+
+# r_mon is your SpatRaster
+# Resolution (pixel size in map units)
+res(r_mon)
+# CRS / projection (WKT string)
+crs(r_mon)
+# A friendlier summary: EPSG if recognized + proj string
+terra::crs(r_mon, describe=TRUE)
+# Extent (bounding box) in CRS units
+ext(r_mon)
+# Dimensions: nrows, ncols, nlyr
+dim(r_mon)
+# Number of cells
+ncell(r_mon)
+
+# r_10yr is your SpatRaster
+# Resolution (pixel size in map units)
+res(r_10yr)
+# CRS / projection (WKT string)
+crs(r_10yr)
+# A friendlier summary: EPSG if recognized + proj string
+terra::crs(r_10yr, describe=TRUE)
+# Extent (bounding box) in CRS units
+ext(r_10yr)
+# Dimensions: nrows, ncols, nlyr
+dim(r_10yr)
+# Number of cells
+ncell(r_10yr)
+
+# r_10yr is your SpatRaster
+# Resolution (pixel size in map units)
+res(r_moll)
+# CRS / projection (WKT string)
+crs(r_moll)
+# A friendlier summary: EPSG if recognized + proj string
+terra::crs(r_moll, describe=TRUE)
+# Extent (bounding box) in CRS units
+ext(r_moll)
+# Dimensions: nrows, ncols, nlyr
+dim(r_moll)
+# Number of cells
+ncell(r_moll)
 
