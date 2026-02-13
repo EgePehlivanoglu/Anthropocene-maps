@@ -53,9 +53,6 @@ r_moll <- project(r_10yr[[nlyr(r_10yr)]], mollweide_crs)
 # r_10yr[[nlyr(r_10yr)]] 
 # note that it is updated now it spans 2017-2026 and hence the middle of russia is blank.
 
-# Create a mask for values greater than 2
-r_anomaly <- clamp(r_moll, lower = 2, value = FALSE)  # Sets values < 2 to NA
-
 # Get world map data
 world <- ne_countries(scale = "medium", returnclass = "sf")
 world_vect <- vect(world)
@@ -64,13 +61,10 @@ world_moll <- project(world_vect, mollweide_crs)
 
 # 6) convert spatraster to a dataframe ---------
 
-# # Make a full cell-by-cell dataframe (includes NA cells)
-# df <- as.data.frame(r_anomaly, xy = TRUE, na.rm = TRUE) # this is if you wanted to exclude the NA cells
-
-# The value column name is the layer name: "2017-2026"
-val_col <- names(r_anomaly)[1]
 # Create a mask for values greater than 2
 r_anomaly <- clamp(r_moll, lower = 2, value = FALSE)  # Sets values < 2 to NA
+# The value column name is the layer name: "2017-2026"
+val_col <- names(r_anomaly)[1]
 df <- as.data.frame(r_anomaly, xy = TRUE, na.rm = FALSE)  # columns: x, y, value #### important that na.rm is false so it keeps NAs too.
 df_bin <- df %>%
   mutate(
@@ -78,19 +72,16 @@ df_bin <- df %>%
   )
 df_bin$bin <- as.factor(df_bin$bin)
 
-# ---- target CRS: Mollweide ----
-# Using a standard proj string for world Mollweide
-crs_moll <- "+proj=moll +lon_0=0 +datum=WGS84 +units=m +no_defs"
 # ---- country boundaries -> sf -> Mollweide ----
 world <- ne_countries(scale = "medium", returnclass = "sf")
-world_moll <- st_transform(world, crs = crs_moll)
+world_moll <- st_transform(world, crs = mollweide_crs)
 
 # 7) plot----------
 bin_climate_change_plot <- ggplot() +
   geom_tile(data = df_bin, aes(x = x, y = y, fill = factor(bin))) +
   # optional if you already have it:
   geom_sf(data = world_moll, fill = NA, color = "black", linewidth = 0.1) +
-  coord_sf(crs = crs_moll, expand = TRUE) +
+  coord_sf(crs = mollweide_crs, expand = TRUE) +
   scale_fill_manual(values = c(`0` = "white", `1` = "red"), name = "Data Present") +
   labs(x = NULL, y = NULL) +
   theme_minimal() +
@@ -105,3 +96,4 @@ bin_climate_change_plot <- ggplot() +
 # pdf(file = "binary climate change plot2017-26.pdf")
 # bin_climate_change_plot
 # dev.off()
+
