@@ -27,6 +27,21 @@ r <- rast(tif_path)                     # should be WGS84 per metadata
 r[r %in% c(-1, -2)] <- NA              # keep raw counts for everything else
 names(r) <- "value"
 
+# ----- investigate the dataset -----
+# r is your SpatRaster
+# Resolution (pixel size in map units)
+res(r)
+# CRS / projection (WKT string)
+crs(r)
+# A friendlier summary: EPSG if recognized + proj string
+terra::crs(r, describe=TRUE)
+# Extent (bounding box) in CRS units
+ext(r)
+# Dimensions: nrows, ncols, nlyr
+dim(r)
+# Number of cells
+ncell(r)
+
 # ---- target CRS: Mollweide ----
 # Using a standard proj string for world Mollweide
 crs_moll <- "+proj=moll +lon_0=0 +datum=WGS84 +units=m +no_defs"

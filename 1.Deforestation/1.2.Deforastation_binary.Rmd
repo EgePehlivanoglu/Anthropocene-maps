@@ -28,7 +28,7 @@ r_all <- rast(tif_path)
 r <- r_all[[1]]          # dominant class only
 r <- clamp(r, 1, 7,  values = FALSE)      # be safe: anything outside 1..7 to NA
 # FALSE is added recently
-r <- as.factor(r)        # categorical
+# Investigate data
 # r is your SpatRaster
 # Resolution (pixel size in map units)
 res(r)
@@ -42,6 +42,8 @@ ext(r)
 dim(r)
 # Number of cells
 ncell(r)
+# convert data to categorical (factor) for plotting
+r <- as.factor(r)        # categorical
 ```
 
 # 3.1. Decrease resolution

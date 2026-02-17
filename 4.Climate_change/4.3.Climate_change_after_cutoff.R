@@ -3,7 +3,7 @@
 # install librarian package (working better than pacman)
 # From CRAN:
 install.packages("librarian")
-librarian::shelf(R.utils, terra, zoo, tidyverse, scales, rnaturalearth, rnaturalearthdata) # install and load packages
+librarian::shelf(R.utils, terra, zoo, tidyverse, scales, sf, rnaturalearth, rnaturalearthdata) # install and load packages
 
 
 # ---- 1) get GISTEMP monthly LOTI grid ----
