@@ -102,6 +102,9 @@ r_moll
 # metadata: -1 = non-ag land, -2 = water/no data  -> set to NA
 r_moll[r_moll %in% c(-1, -2)] <- NA              # keep raw counts for everything else
 names(r_moll) <- "value"
+# ---- target CRS: Mollweide ----
+# Using a standard proj string for world Mollweide
+crs_moll <- "+proj=moll +lon_0=0 +datum=WGS84 +units=m +no_defs"
 
 # ---- country boundaries -> sf -> Mollweide ----
 world <- ne_countries(scale = "medium", returnclass = "sf")
@@ -126,8 +129,7 @@ lev <- data.frame(
 
 df_bin <- merge(df, lev, by.x = "value", by.y = "ID", all.x = TRUE)  %>% # set value as factorial and merge with lev to get name and binary codes
   mutate(name = factor(name, levels = lev$name), # convert name, binary_codes columns to factor
-         binary_codes = factor(binary_codes, levels = c(0,1))) %>% 
-  select(x, y, value, name, binary_codes) # select only the columns we need
+         binary_codes = factor(binary_codes, levels = c(0,1)))
 ```
 
 
@@ -135,12 +137,12 @@ df_bin <- merge(df, lev, by.x = "value", by.y = "ID", all.x = TRUE)  %>% # set v
 ```{r}
 bin_plot_hr <- ggplot() +
   geom_tile(data = df_bin, aes(x = x, y = y, fill = binary_codes)) +
-  geom_sf(data = world_moll, fill = NA, color = "black", linewidth = 0.2) +
+  geom_sf(data = world_moll, fill = NA, color = "black", linewidth = 0.1) +
   coord_sf() +
   scale_fill_manual(
     name = "Disturbance Types",
-    values = c("0" = "#f4d03f",  # low risk (example yellow)
-               "1" = "#c0392b",  # high risk (example red)
+    values = c("0" = "seagreen4",  # low risk (example yellow)
+               "1" = "salmon4",  # high risk (example red)
                "NA" = "white"),  # explicitly map NA to white
     na.value = "white",           # ensures NAs are white
     labels = c("0" = "Temporary", "1" = "Permanent")
@@ -163,7 +165,7 @@ bin_plot_hr <- ggplot() +
   )
 bin_plot_hr
 
-#save plot
+# #save plot
 # pdf(file = "2026-02-17_deforestation_binary_plot.pdf", width = 11, height = 6.5)
 # bin_plot_hr
 # dev.off()
