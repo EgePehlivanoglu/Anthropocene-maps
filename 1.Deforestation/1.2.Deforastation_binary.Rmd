@@ -29,7 +29,8 @@ r <- r_all[[1]]          # dominant class only
 r <- clamp(r, 1, 7,  values = FALSE)      # be safe: anything outside 1..7 to NA
 # FALSE is added recently
 # Investigate data
-# r is your SpatRaster
+# r is your SpatRaster object. Here are some key properties to check:
+r
 # Resolution (pixel size in map units)
 res(r)
 # CRS / projection (WKT string)
@@ -182,7 +183,11 @@ bin_plot_5km_res
 
 ```{r}
 # 3) Reproject to Mollweide (categorical -> nearest neighbor)
-r_moll <- project(r, "ESRI:54009", method = "near")
+#r_moll <- project(r, "ESRI:54009", method = "near")
+#use new projection since many points failed to transform (specify the resolution)
+moll <- "+proj=moll +lon_0=0 +datum=WGS84 +units=m +no_defs"
+r_moll <- terra::project(r, moll, method="near", res=10000)
+
 #r_moll_5km_cat <- aggregate(r_moll, fact = fact, fun = "modal")
 #r_5km_cat <- aggregate(r, fact = fact, fun = "modal")
 # Attach human-readable labels from the dataset docs (v1.2)
@@ -214,10 +219,6 @@ pal <- c(
   "Other natural disturbances"     = "#BDBDBD"
 )
 
-# Add layer
-# install.packages(c("rnaturalearth", "rnaturalearthdata"))  # if needed
-library(rnaturalearth)
-library(sf)
 
 # 1) Get land polygons and project to Mollweide
 land <- ne_countries(scale = "medium", returnclass = "sf")
