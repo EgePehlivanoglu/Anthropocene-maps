@@ -1,5 +1,8 @@
-# Install (if not already installed)
-install.packages(c("raster", "sf", "rnaturalearth", "rnaturalearthdata", "ggplot2", "viridis"))
+# Workflow
+# 1. Load data (tiff file)
+# 2. Reproject to Mollweide
+# 3. Binary transformation (low risk score vs high risk score)
+
 
 # Load packages
 # install librarian package (working better than pacman)
@@ -19,7 +22,7 @@ librarian::shelf(raster,       # for raster data handling
 # + Give 0 for values low to medium (until 3)
 # + Give 1 for values high (3 or above)
 
-# ---- inputs ----
+# ---- 1. load data ----
 tif_path <- "~/Library/CloudStorage/OneDrive-StockholmUniversity/KVA backup/KVAOneDrive_backup_28Jan2026/2. Projects/4.Cascades/Editorial Review 20250807/map/Base maps/5.Pesticide_use/Tang 2021/data/Global_pesticide_risk_scores.tif"  # <- your file
 # ---- read raster in WGS84 and clean special values ----
 r <- rast(tif_path)                     # should be WGS84 per metadata
@@ -42,21 +45,35 @@ dim(r)
 # Number of cells
 ncell(r)
 
-# ---- target CRS: Mollweide ----
+# ---- 2. reproject CRS: Mollweide ----
 # Using a standard proj string for world Mollweide
 crs_moll <- "+proj=moll +lon_0=0 +datum=WGS84 +units=m +no_defs"
 
 # ---- reproject raster (use nearest neighbor to preserve raw counts) ----
 r_moll <- project(r, crs_moll, method = "near")
 
-# (Optional) speed up plotting if huge:
-# r_moll <- aggregate(r_moll, fact = 2, fun = "first")
+# ----- investigate the reporjected dataset -----
+# r_moll is your SpatRaster
+r_moll
+# Resolution (pixel size in map units)
+res(r_moll)
+# CRS / projection (WKT string)
+crs(r_moll)
+# A friendlier summary: EPSG if recognized + proj string
+terra::crs(r_moll, describe=TRUE)
+# Extent (bounding box) in CRS units
+ext(r_moll)
+# Dimensions: nrows, ncols, nlyr
+dim(r_moll)
+# Number of cells
+ncell(r_moll)
 
-# ---- country boundaries -> sf -> Mollweide ----
+
+# ---- add country boundaries -> sf -> Mollweide ----
 world <- ne_countries(scale = "medium", returnclass = "sf")
 world_moll <- st_transform(world, crs = crs_moll)
 
-# ---- to data frame for ggplot ----
+# ---- 3. binary transformation ----
 df <- as.data.frame(r_moll, xy = TRUE, na.rm = TRUE)  # columns: x, y, value
 
 df_bin <- df %>% 
@@ -64,7 +81,7 @@ df_bin <- df %>%
                            value >0 & value <3  ~ "0",  
                            value >=3 ~ "1"), factor(RS_bin))
 
-
+# ----- 4. plotting ----
 bin_plot <- ggplot() +
   geom_tile(data = df_bin, aes(x = x, y = y, fill = RS_bin)) +
   geom_sf(data = world_moll, fill = NA, color = "black", linewidth = 0.2) +
