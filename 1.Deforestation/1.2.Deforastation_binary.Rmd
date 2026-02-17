@@ -103,16 +103,6 @@ r_moll
 r_moll[r_moll %in% c(-1, -2)] <- NA              # keep raw counts for everything else
 names(r_moll) <- "value"
 
-# # ---- target CRS: Mollweide ----
-# # # Using a standard proj string for world Mollweide
-#  crs_moll <- "+proj=moll +lon_0=0 +datum=WGS84 +units=m +no_defs"
-# # 
-# # # ---- reproject raster (use nearest neighbor to preserve raw counts) ----
-#  r_moll2 <- project(r_moll, crs_moll, method = "near")
-
-# (Optional) speed up plotting if huge:
-# r_moll <- aggregate(r_moll, fact = 2, fun = "first")
-
 # ---- country boundaries -> sf -> Mollweide ----
 world <- ne_countries(scale = "medium", returnclass = "sf")
 world_moll <- st_transform(world, crs = crs_moll)
@@ -135,8 +125,7 @@ lev <- data.frame(
 )
 
 df_bin <- merge(df, lev, by.x = "value", by.y = "ID", all.x = TRUE)  %>% # set value as factorial and merge with lev to get name and binary codes
-# convert value name, binary_codes columns to factor
-  mutate(name = factor(name, levels = lev$name), 
+  mutate(name = factor(name, levels = lev$name), # convert name, binary_codes columns to factor
          binary_codes = factor(binary_codes, levels = c(0,1))) %>% 
   select(x, y, value, name, binary_codes) # select only the columns we need
 ```
