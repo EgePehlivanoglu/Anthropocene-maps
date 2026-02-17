@@ -1,5 +1,14 @@
 #Climate Change with bigger than 2 degreee cutoff
 
+# Workflow
+# 1. Get GISTEMP monthly LOTI grid (1880-2026)
+# 2. Load monthly raster
+# 3. Build dates WITHOUT using time<- (GISTEMP monthly starts 1880  -01)  
+# 4. Annual means per cell (group by year labels) 
+# 5. 10-year running means
+# 6. Convert spatraster to a dataframe
+# 7. Plot
+
 # install librarian package (working better than pacman)
 # From CRAN:
 install.packages("librarian")
@@ -88,6 +97,7 @@ bin_climate_change_plot <- ggplot() +
 ## TBC. Investigate data --------
 
 # r_mon is your SpatRaster
+r_mon
 # Resolution (pixel size in map units)
 res(r_mon)
 # CRS / projection (WKT string)
@@ -128,4 +138,18 @@ ext(r_moll)
 dim(r_moll)
 # Number of cells
 ncell(r_moll)
+
+# r_anomaly is your SpatRaster
+# Resolution (pixel size in map units)
+res(r_anomaly)
+# CRS / projection (WKT string)
+crs(r_anomaly)
+# A friendlier summary: EPSG if recognized + proj string
+terra::crs(r_anomaly, describe=TRUE)
+# Extent (bounding box) in CRS units
+ext(r_anomaly)
+# Dimensions: nrows, ncols, nlyr
+dim(r_anomaly)
+# Number of cells
+ncell(r_anomaly)
 
