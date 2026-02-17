@@ -4,13 +4,10 @@ output: html_notebook
 ---
 # Load Packages
 ```{r}
-install.packages("pacman")
-library(pacman)
-p_load(httr)
-# install.packages("tmap", repos = c("https://r-tmap.r-universe.dev", "https://cloud.r-project.org"))
-p_load(terra)
-p_load(tmap)     # nice cartography
-
+# install librarian package (working better than pacman)
+# From CRAN:
+install.packages("librarian")
+librarian::shelf(httr, terra, tmap, tidyverse) # install and load packages
 ```
 
 # 1. Load Data
@@ -178,9 +175,6 @@ bin_plot_5km_res <- ggplot() +
   )
 bin_plot_5km_res
 ```
-
-
-
 
 # 4.1. High resolution
 

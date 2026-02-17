@@ -1,13 +1,16 @@
 # Install (if not already installed)
 install.packages(c("raster", "sf", "rnaturalearth", "rnaturalearthdata", "ggplot2", "viridis"))
 
-# Load libraries
-library(raster)       # for raster data handling
-library(sf)           # for vector data (shapefiles)
-library(rnaturalearth)# to get country boundaries
-library(tidyverse)      # for plotting
-library(viridis)      # for nice color scales (optional)
-library(terra) # for rast function
+# Load packages
+# install librarian package (working better than pacman)
+# From CRAN:
+install.packages("librarian")
+librarian::shelf(raster,       # for raster data handling
+                 sf,           # for vector data (shapefiles)
+                 rnaturalearth,# to get country boundaries
+                 tidyverse,      # for plotting
+              #  viridis, # for nice color scales (optional)
+                 terra) # for rast function
 
 # Binary Global pesticide risk scores ########
 # *Assumptions*

@@ -10,13 +10,11 @@
 # So anything below 50th percentile is 0, anything above is 1. 
 
 # Load packages
-# install.packages("pacman")
-library(pacman)
-p_load(tidyverse)
-p_load(terra)
-p_load(rnaturalearth)
-p_load(sf)
-p_load(maps)
+# install librarian package (working better than pacman)
+# From CRAN:
+install.packages("librarian")
+librarian::shelf(tidyverse, terra, rnaturalearth, sf, maps) # install and load packages
+
 
 ## Load Data
 
