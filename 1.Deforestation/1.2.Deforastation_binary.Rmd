@@ -83,139 +83,7 @@ ncell(r)
 r <- as.factor(r)        # categorical
 ```
 
-# 3.1. Decrease resolution
-
-```{r}
-# 3) Reproject to Mollweide (categorical -> nearest neighbor)
-r_moll <- project(r, "ESRI:54009", method = "near")
-#define fact
-fact <- round(5000 / res(r_moll)[1])
-r_moll_5km <- aggregate(r_moll, fact = fact, fun = "modal", na.rm = TRUE)
-res(r_moll_5km)
-#r_moll_5km_cat <- aggregate(r_moll, fact = fact, fun = "modal")
-#r_5km_cat <- aggregate(r, fact = fact, fun = "modal")
-# Attach human-readable labels from the dataset docs (v1.2)
-# Codes: 1 Perm. agriculture, 2 Hard commodities, 3 Shifting cultivation,
-# 4 Logging, 5 Wildfire, 6 Settlements & infrastructure, 7 Other natural disturbances
-lev <- data.frame(
-  ID   = 1:7,
-  name = c("Permanent agriculture",
-           "Hard commodities",
-           "Shifting cultivation",
-           "Logging",
-           "Wildfire",
-           "Settlements & infrastructure",
-           "Other natural disturbances"),
-  binary_codes =c(1,1,1,0,0,0,0)
-)
-levels(r_moll_5km) <- list(lev)
-
-
-# 4) Styling & plot (tmap)
-# A readable, distinct palette (adjust if you want to match GFW’s exact colors)
-pal <- c(
-  "Permanent agriculture"          = "#E31A1C",
-  "Hard commodities"               = "#A65628",
-  "Shifting cultivation"           = "#FF7F00",
-  "Logging"                        = "#1F78B4",
-  "Wildfire"                       = "#6A3D9A",
-  "Settlements & infrastructure"   = "#B2DF8A",
-  "Other natural disturbances"     = "#BDBDBD"
-)
-
-tmap_mode("plot")
-tm <- tm_shape(r_moll_5km) +
-  tm_raster(col.style = tm_scale_categorical(pal),
-            title = "Dominant drivers of tree cover loss (2001–2024)") +
-  tm_layout(frame = FALSE, legend.outside = TRUE, legend.text.size = 0.9) +
-  tm_grid(lines = TRUE, lwd = 0.2, alpha = 0.15)
-tm
-# Add layer
-# install.packages(c("rnaturalearth", "rnaturalearthdata"))  # if needed
-library(rnaturalearth)
-library(sf)
-
-# 1) Get land polygons and project to Mollweide
-land <- ne_countries(scale = "medium", returnclass = "sf")
-land_moll <- st_transform(land, "ESRI:54009")
-
-# 2) Build the map: background first, then raster on top
-tmap_mode("plot")
-tm <- tm_shape(land_moll) +
-  tm_polygons(col = "#E6EFF4", border.col = "#B8C9D3", lwd = 0.3) +  # oceans show through white bg; land tinted
-  tm_shape(r_moll_5km) +
-  tm_raster(style = "cat", palette = pal,
-            title = "Dominant drivers of tree cover loss (2001–2024)") +
-  tm_grid(lines = TRUE, lwd = 0.2, alpha = 0.15) +
-  tm_layout(frame = FALSE, legend.outside = TRUE)
-tm
-```
-
-# 3.2. Binary transformation for decreased resolution
-
-```{r}
-# metadata: -1 = non-ag land, -2 = water/no data  -> set to NA
-r_moll_5km[r_moll_5km %in% c(-1, -2)] <- NA              # keep raw counts for everything else
-names(r_moll_5km) <- "value"
-
-# ---- target CRS: Mollweide ----
-# Using a standard proj string for world Mollweide
-crs_moll <- "+proj=moll +lon_0=0 +datum=WGS84 +units=m +no_defs"
-
-# ---- reproject raster (use nearest neighbor to preserve raw counts) ----
-r_moll <- project(r_moll_5km, crs_moll, method = "near")
-
-# (Optional) speed up plotting if huge:
-# r_moll <- aggregate(r_moll, fact = 2, fun = "first")
-
-# ---- country boundaries -> sf -> Mollweide ----
-world <- ne_countries(scale = "medium", returnclass = "sf")
-world_moll <- st_transform(world, crs = crs_moll)
-
-# ---- to data frame for ggplot ----
-df <- as.data.frame(r_moll_5km, xy = TRUE, na.rm = TRUE)  # columns: x, y, value
-
-df_bin <- df %>% 
-  mutate(df_bin= case_when(value == "Permanent agriculture" ~ 1,
-                           value == "Hard commodities" ~ 1,
-                           value == "Shifting cultivation" ~ 1,
-                           value == "Logging" ~ 0,
-                           value == "Wildfire" ~ 0,
-                           value == "Settlements & infrastructure" ~ 0,
-                           value == "Other natural disturbances" ~ 0), factor(df_bin))
-
-bin_plot_5km_res <- ggplot() +
-  geom_tile(data = df_bin, aes(x = x, y = y, fill = factor(df_bin))) +
-  geom_sf(data = world_moll, fill = NA, color = "black", linewidth = 0.2) +
-  coord_sf() +
-  scale_fill_manual(
-    name = "Disturbance Types",
-    values = c("0" = "#f4d03f",  # low risk (example yellow)
-               "1" = "#c0392b",  # high risk (example red)
-               "NA" = "white"),  # explicitly map NA to white
-    na.value = "white",           # ensures NAs are white
-    labels = c("0" = "Temporary", "1" = "Permanent")
-  ) +
-  labs(
-    title = "Deforestation Plot",
-    subtitle = "Binary Transformed Data",
-    caption = "Permanent Disturbances:Permanent agriculture, Hard commodities, Shifting cultivation. Temporary Disturbances: Logging, Wildfire, Settlements & infrastructure, and Other natural disturbances",
-    x = NULL, y = NULL
-  ) +
-  theme_minimal(base_size = 11) +
-  theme(
-    # panel.background = element_rect(fill = "gray85", color = NA), # gray background (ocean)
-    # plot.background = element_rect(fill = "gray85", color = NA),
-    panel.grid = element_blank(),
-    legend.position = "right",
-    legend.title = element_text(face = "bold"),
-    legend.key.height = unit(0.6, "cm"),
-    legend.text = element_text(size = 9)
-  )
-bin_plot_5km_res
-```
-
-# 4.1. Change resolution Resolution
+# 3. Change Resolution
 
 Resolution changed to 10 km
 
@@ -228,7 +96,7 @@ r_moll <- terra::project(r, moll, method="near", res=10000)
 r_moll
 ```
 
-# 4.2. Binary transformation for high resolution
+# 4. Binary transformation for high resolution
 
 ```{r}
 # metadata: -1 = non-ag land, -2 = water/no data  -> set to NA
@@ -271,8 +139,11 @@ df_bin <- merge(df, lev, by.x = "value", by.y = "ID", all.x = TRUE)  %>% # set v
   mutate(name = factor(name, levels = lev$name), 
          binary_codes = factor(binary_codes, levels = c(0,1))) %>% 
   select(x, y, value, name, binary_codes) # select only the columns we need
+```
 
 
+# 5. Plot
+```{r}
 bin_plot_hr <- ggplot() +
   geom_tile(data = df_bin, aes(x = x, y = y, fill = binary_codes)) +
   geom_sf(data = world_moll, fill = NA, color = "black", linewidth = 0.2) +
@@ -302,6 +173,11 @@ bin_plot_hr <- ggplot() +
     legend.text = element_text(size = 9)
   )
 bin_plot_hr
+
+#save plot
+# pdf(file = "2026-02-17_deforestation_binary_plot.pdf", width = 11, height = 6.5)
+# bin_plot_hr
+# dev.off()
 ```
 
 
