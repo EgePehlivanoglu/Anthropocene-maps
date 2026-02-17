@@ -1,15 +1,9 @@
 #Climate Change with bigger than 2 degreee cutoff
 
-
-library(pacman)
-p_load(terra)
-p_load(R.utils)
-p_load(zoo)
-p_load(tidyverse)
-p_load(scales)
-p_load(rnaturalearth)
-p_load(rnaturalearthdata)
-
+# install librarian package (working better than pacman)
+# From CRAN:
+install.packages("librarian")
+librarian::shelf(R.utils, terra, zoo, tidyverse, scales, rnaturalearth, rnaturalearthdata) # install and load packages
 
 
 # ---- 1) get GISTEMP monthly LOTI grid ----
