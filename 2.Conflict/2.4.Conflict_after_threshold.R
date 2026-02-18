@@ -23,7 +23,7 @@ GEDEvent_v25_1 <- GEDEvent_v25_1 <- readRDS("~/Library/CloudStorage/OneDrive-Sto
 # Manipulate Data  -----------------------------
 ### Parameters # -----------------------------
 sum_field    <- "best"            # "best", "high", "low", etc.
-cell_km      <- 50                # grid resolution (km): try 25/50/100
+cell_km      <- 10                # grid resolution (km): try 25/50/100
 crs_moll     <- "ESRI:54009"      # Mollweide (equal-area)
 
 ## Data → points (WGS84 → Mollweide)# -----------------------------
@@ -57,6 +57,24 @@ r_sum_land  <- mask(r_sum, vect(land_sf))
 
 # this brings back all the 0s
 bin_sum_land <- clamp(r_sum_land, values = TRUE)
+
+#------- Investigate the raster (bin sum_land) -----------------------------
+# Investigate data
+# r is your SpatRaster object. Here are some key properties to check:
+r<- bin_sum_land
+# Resolution (pixel size in map units)
+res(r)
+# CRS / projection (WKT string)
+crs(r)
+# A friendlier summary: EPSG if recognized + proj string
+terra::crs(r, describe=TRUE)
+# Extent (bounding box) in CRS units
+ext(r)
+# Dimensions: nrows, ncols, nlyr
+dim(r)
+# Number of cells
+ncell(r)
+
 # 1. All NAs excluded
 df_bin <- as.data.frame(bin_sum_land, xy = TRUE, na.rm = TRUE)
 # 2. All 0s excluded
