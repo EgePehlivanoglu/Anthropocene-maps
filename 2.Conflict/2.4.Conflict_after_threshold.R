@@ -162,3 +162,6 @@ conflict_binary_single <- ggplot() +
 # pdf(file = "q50_bin_NAsconverted0.pdf")
 # conflict_binary_single
 # dev.off()
+pdf(file = "q50_bin_NAsconverted0.pdf")
+conflict_binary_single
+dev.off()
