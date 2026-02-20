@@ -3,6 +3,21 @@ title: "R Notebook"
 output: html_notebook
 ---
 Based on Allen 2017 paper
+From README on github:
+The file data/predictions.RData contains the output of the model. All variables are described in more depth in the paper.
+
+The columns lon and lat are WGS84 longitude and latitude. gridid is a grid cell identifier.
++ bsm_weight_pubs is the model’s output weighted with publications (“observed”).
++ bsm_weight_pop is the model’s output weighted with population (“bias factored out”).
++ bsm_response is the model’s output weighted with neither.
+The other columns are generally predictor variables used in the model.
+
+I used bsm_response on the data Peter suggested. But it produced figure 4. 
+
+However, on the metadata of the file I download bsm_response is described as:
+https://github.com/ecohealthalliance/hotspots2/blob/a27520e8d6fe1950cb4b88299efcd229e36135b9/inst/out/unbl_data/metadata.csv
+bsm_response: The binomial probability that a grid cell sampled at that location will contain an EID event as opposed to a background sample, when drawing equal numbers of absence and background samples weighted by reporting effort.
+
 ```{r}
 # Repro map of zoonotic EID hotspots (Allen et al. 2017) in R
 # Packages
@@ -20,7 +35,7 @@ data <- eid_risk_relative_to_reporting_effor
   
 ```{r}
 # Figure 4
-ggplot(data, aes(x = lon, y = lat, fill = bsm_response)) +
+ggplot(eid_risk_relative_to_reporting_effor, aes(x = lon, y = lat, fill = bsm_response)) +
   geom_raster() +
   viridis:::scale_fill_viridis(
     option = "viridis",   # matches panel B
@@ -35,3 +50,226 @@ ggplot(data, aes(x = lon, y = lat, fill = bsm_response)) +
     legend.title = element_text(color = "white")
   )
 ```
+
+#Figure 4 polished
+
+```{r}
+# Land mask (so country borders are visible)
+land_sf     <- ne_countries(scale = "medium", returnclass = "sf") 
+
+ggplot() +
+  # geom_polygon(aes(x = lon, y = lat, group = group), data = map.world(), inherit.aes = FALSE, fill = viridis(1)) +
+  geom_raster(aes(x = lon, y = lat, fill = bsm_response), data = eid_risk_relative_to_reporting_effor) +
+   # geom_path(aes(x = lon, y = lat, group = group), data = map.world(), inherit.aes = FALSE, color = "white", size = 0.15) +
+  geom_sf(data =land_sf, fill = NA, color = "white", size = 0.15) +
+  #  coord_fixed() +
+  ylim(-65, 90) +
+  scale_fill_gradientn(colours = viridis(100),
+                       guide = guide_colorbar(label = TRUE,
+                                              label.position = "right",
+                                              title = "Event probability\n(relative to\nreporting effort)")) +
+#  theme_black_legend() +
+  theme(panel.background = element_rect(fill = "black"),
+        plot.background  = element_rect(fill = "black"),
+        line = element_blank(),
+        legend.title = element_text(color = "white", size = 8),
+        legend.text = element_text(color = "white", size = 8),
+        legend.title.align = 0,
+        legend.background = element_blank(),
+        legend.position = c(0.11, 0.45)) +
+  labs(x = NULL, y = NULL)
+```
+# try to increase resolution
+```{r}
+# Manipulate Data  -----------------------------
+### Parameters # -----------------------------
+sum_field    <- "bsm_response"            # "best", "high", "low", etc.
+cell_km      <- 10                # grid resolution (km): try 25/50/100
+crs_moll     <- "ESRI:54009"      # Mollweide (equal-area)
+
+## Data → points (WGS84 → Mollweide)# -----------------------------
+
+dat_df <- eid_risk_relative_to_reporting_effor %>%
+  as.data.frame()
+
+stopifnot(sum_field %in% names(dat_df))
+
+pts_ll   <- vect(dat_df, geom = c("lon","lat"), crs = "EPSG:4326")
+pts_moll <- project(pts_ll, crs_moll)
+
+## Equal-area raster grid in Mollweide # -----------------------------
+
+cell_m  <- cell_km * 1000
+r_moll  <- rast(xmin = -18000000, xmax = 18000000,
+                ymin =  -9000000, ymax =  9000000,
+                resolution = cell_m, crs = crs_moll)
+
+## Rasterize: SUM within each cell# -----------------------------
+
+r_sum <- rasterize(pts_moll, r_moll, field = sum_field)
+
+# Land mask (so oceans are blank)
+land_sf     <- ne_countries(scale = "medium", returnclass = "sf") |> st_transform(crs_moll)
+# create main data------
+r_sum_land  <- mask(r_sum, vect(land_sf)) 
+
+ggplot(data = r_sum_land, aes(x = x, y = y, fill = last)) +
+  geom_tile() +
+  geom_sf(data = land_sf, fill = NA, color = "lightgray", linewidth = 0.1) +
+  coord_sf(crs = st_crs(crs_moll), expand = FALSE) +
+#  geom_sf(data =land_sf, fill = NA, color = "white", size = 0.15) +
+  #  coord_fixed() +
+#  ylim(-65, 90) +
+  scale_fill_gradientn(colours = viridis(100),
+                       guide = guide_colorbar(label = TRUE,
+                                              label.position = "right",
+                                              title = "Event probability\n(relative to\nreporting effort)")) +
+theme(panel.background = element_rect(fill = "black"),
+        plot.background  = element_rect(fill = "black"),
+        line = element_blank(),
+        legend.title = element_text(color = "white", size = 8),
+        legend.text = element_text(color = "white", size = 8),
+        legend.title.align = 0,
+        legend.background = element_blank(),
+        legend.position = c(0.11, 0.45)) +
+  labs(x = NULL, y = NULL)
+
+```
+
+
+```{r}
+library(terra)
+
+template_raster <- function() {
+  library(raster)
+  library(sp)
+
+  template_raster <- read.table(system.file("data-raw", "eid08_drivers_19OCT11.txt", package = "hotspots2"), header=TRUE, sep="\t")
+  template_raster <- template_raster[, c("lon", "lat", "GridID")]
+  coordinates(template_raster) <- c("lon", "lat")
+  gridded(template_raster) <- TRUE
+  proj4string(template_raster) <- "+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"
+  template_raster <- raster(template_raster)
+  return(template_raster)
+}
+
+.template_df <- function(save_to_data = FALSE) {
+  template_df <- read.table(system.file("data-raw", "eid08_drivers_19OCT11.txt", package = "hotspots2"), header=TRUE, sep="\t") %>%
+    select(gridid = GridID, lon, lat)
+  if (save_to_data) {
+    save(template_df, file = file.path(data_dir(), "template_df.RData"))
+  } else {
+    return(template_df)
+  }
+}
+predictions <- data
+# Output for bsm_weight_pop_large
+# Large version for EHA gala
+map_data <- predictions %>%
+  select(x = lon, y = lat, z = bsm_response) %>%
+  rasterFromXYZ(crs = crs(template_raster())) %>%
+  raster::disaggregate(4, method = "bilinear") %>%
+  mask(mask = country_outlines) %>%
+  as.data.frame(xy = TRUE) %>%
+  na.omit()
+
+numcolors <- length(unique(map_data[["z"]]))
+
+
+
+ggplot() +
+  geom_polygon(aes(x = lon, y = lat, group = bsm_response), data = predictions, inherit.aes = FALSE, fill = viridis(1)) +
+  geom_raster(aes(x = lon, y = , fill = clip_at_sd(bsm_response, 2)), data = eid) +
+  geom_path(aes(x = lon, y = lat, group = group), data = eid, inherit.aes = FALSE, color = "white", size = 0.15) +
+  coord_fixed() +
+  ylim(-65, 90) +
+  scale_fill_gradientn(colours = viridis(numcolors),
+                       guide = guide_colorbar(label = TRUE,
+                                              label.position = "right",
+                                              title = "Event probability\n(relative to\nreporting effort)")) +
+  theme_black_legend() +
+  theme(legend.title = element_text(color = "white", size = 8),
+        legend.text = element_text(color = "white", size = 8),
+        legend.title.align = 0,
+        legend.background = element_blank(),
+        legend.position = c(0.11, 0.45)) +
+  labs(x = NULL, y = NULL)
+
+```
+# check predictions.RData
+
+```{r}
+load("/Users/egepehlivanoglu/Library/CloudStorage/OneDrive-StockholmUniversity/KVA backup/KVAOneDrive_backup_28Jan2026/2. Projects/4.Cascades/Editorial Review 20250807/map/Base maps/6.Infectious_diseases/Allen 2017/predictions.RData")
+
+
+# compare two datasets
+
+eid <- eid_risk_relative_to_reporting_effor %>% select(c(lon, lat, bsm_response)) %>% as.data.frame()
+pred <- predictions %>% select(c(lon, lat, bsm_response))
+
+identical(eid_risk_relative_to_reporting_effor %>% select(c(lon, lat, bsm_response)), predictions %>% select(c(lon, lat, bsm_response)))
+
+# q: how to check different rows in two datasets? 
+
+identical(eid, pred)
+# check if all rows in eid are in pred
+all(eid %in% pred)
+all(pred %in% eid)
+
+dplyr::anti_join(eid, pred)
+dplyr::semi_join(eid, pred)
+
+```
+
+```{r}
+data(predictions)
+predictions <- select(predictions, gridid, lon, lat,
+                      bsm_response, weight_pubs, weight_pop, bsm_weight_pubs, bsm_weight_pop)
+
+quickmap(predictions, quantvar(weight_pubs - weight_pop))
+library(dismo)
+library(gbm)
+library(purrr)
+library(viridis)
+
+clip_at_sd <- function(x, multiple = 1) {
+  m <- mean(x, na.rm = TRUE)
+  s <- sd(x, na.rm = TRUE) * multiple
+  y <- x %>%
+    pmin(m + s) %>%
+    pmax(m - s)
+  return(y)
+}
+
+data(predictions)
+predictions <- select(predictions, gridid, lon, lat,
+                    bsm_response, weight_pubs, weight_pop, bsm_weight_pubs, bsm_weight_pop)
+
+# Output for bsm_weight_pubs
+pretty <- predictions %>%
+  select(x = lon, y = lat, z = bsm_weight_pubs) %>%
+  rasterFromXYZ(crs = crs(template_raster())) %>%
+  raster::disaggregate(2, method = "bilinear") %>%
+  mask(mask = country_outlines) %>%
+  as.data.frame(xy = TRUE) %>%
+  na.omit()
+
+numcolors <- length(unique(pretty[["z"]]))
+
+ggplot() +
+  geom_polygon(aes(x = lon, y = lat, group = group), data = map.world(), inherit.aes = FALSE, fill = viridis(1)) +
+  geom_raster(aes(x = x, y = y, fill = clip_at_sd(z, 2)), data = pretty) +
+  geom_path(aes(x = lon, y = lat, group = group), data = map.world(), inherit.aes = FALSE, color = "white", size = 0.15) +
+  coord_fixed() +
+  scale_fill_gradientn(colours = viridis(numcolors),
+                       guide = guide_colorbar()) +
+  theme_black_legend() +
+  theme(legend.title = element_blank(),
+        legend.title.align = 0,
+        legend.text = element_blank(),
+        legend.background = element_blank(),
+        legend.position = c(0.975, 0.5)) +
+  labs(x = NULL, y = NULL)
+
+```
+
