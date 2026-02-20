@@ -1,0 +1,46 @@
+---
+title: "Sum the data"
+output: html_notebook
+---
+
+```{r}
+install.packages("librarian")
+librarian::shelf(here, tidyverse) # install and load packages
+
+here::here("~/Library/CloudStorage/OneDrive-StockholmUniversity/KVA backup/KVAOneDrive_backup_28Jan2026/2. Projects/4.Cascades/Editorial Review 20250807/map/Anthropocene-maps")
+```
+
+# Packages
+```{r}
+
+```
+
+# 1. Deforestation
+
+```{r Deforestation}
+here::here("1.Deforestation/")
+source(file = "1.2.Deforastation_binary.Rmd")
+```
+
+# 2. Conflict
+
+```{r Conflict}
+# source the file for conflict (after threshold)
+source(file = "2.Conflict/2.4.Conflict_after_threshold.R")
+```
+
+
+# 4. Climate Change
+```{r Climate Change}
+# source the file for Climate change (after threshold areas with anomaly bigger than 2 degrees)
+source(file = "4.Climate_change/4.3.Climate_change_after_cutoff.R")
+```
+
+# 5. Pesticide
+```{r Pesticide}
+
+# source the file for conflict (after threshold)
+# double check with Peter if he confirms the threshold
+source(file = "5.Pesticide_use/Tang 2021/5.2.Binary_RiskScores.R")
+```
+

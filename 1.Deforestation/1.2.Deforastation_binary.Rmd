@@ -6,40 +6,44 @@ output: html_notebook
 # Workflow
 # 1. Load data (GeoTIFF from Zenodo)
 # 2. Investigate data (resolution, CRS, extent, dimensions)
-> r
-class       : SpatRaster 
-size        : 14000, 36000, 1  (nrow, ncol, nlyr)
-resolution  : 0.01, 0.01  (x, y)
-extent      : -180, 180, -56, 84  (xmin, xmax, ymin, ymax)
-coord. ref. : lon/lat WGS 84 (EPSG:4326) 
-source      : spat_80851fac04a7_32901_P2mm2aa9P9QX7pk.tif 
-varname     : file808546a31610 
-name        : file808546a31610_1 
-min value   :                  1 
-max value   :                  7 
+```{r TB, eval=FALSE, include=FALSE}
+# <!-- r -->
+# <!-- class       : SpatRaster  -->
+# <!-- size        : 14000, 36000, 1  (nrow, ncol, nlyr) -->
+# <!-- resolution  : 0.01, 0.01  (x, y) -->
+# <!-- extent      : -180, 180, -56, 84  (xmin, xmax, ymin, ymax) -->
+# <!-- coord. ref. : lon/lat WGS 84 (EPSG:4326)  -->
+# <!-- source      : spat_80851fac04a7_32901_P2mm2aa9P9QX7pk.tif  -->
+# <!-- varname     : file808546a31610  -->
+# <!-- name        : file808546a31610_1  -->
+# <!-- min value   :                  1  -->
+# <!-- max value   :                  7  -->
+```
+
+
 
 # 3. Change Resolution Reproject to Mollweide
-Resoulution is changed because otherwise I receive this watning.
+Resolution is changed because otherwise I receive this watning.
 Warning: Too many points (529 out of 529) failed to transform, unable to compute output bounds. (GDAL error 1)
-
-> r_moll
-class       : SpatRaster 
-size        : 1526, 3608, 1  (nrow, ncol, nlyr)
-resolution  : 10000, 10000  (x, y)
-extent      : -18040096, 18039904, -6486272, 8773728  (xmin, xmax, ymin, ymax)
-coord. ref. : +proj=moll +lon_0=0 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs 
-source(s)   : memory
-name        : file808546a31610_1 
-min value   :                  1 
-max value   :                  7 
-
+```{r TBD2, eval=FALSE, include=FALSE}
+# <!-- r_moll -->
+# <!-- class       : SpatRaster  -->
+# <!-- size        : 1526, 3608, 1  (nrow, ncol, nlyr) -->
+# <!-- resolution  : 10000, 10000  (x, y) -->
+# <!-- extent      : -18040096, 18039904, -6486272, 8773728  (xmin, xmax, ymin, ymax) -->
+# <!-- coord. ref. : +proj=moll +lon_0=0 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs  -->
+# <!-- source(s)   : memory -->
+# <!-- name        : file808546a31610_1  -->
+# <!-- min value   :                  1  -->
+# <!-- max value   :                  7  -->
+```
 # 4. Binary transformation (permanent vs temporary) 
 
 # 5. Plot with ggplot
 
 
 # Load Packages
-```{r}
+```{r Load Packages}
 # install librarian package (working better than pacman)
 # From CRAN:
 install.packages("librarian")
@@ -47,7 +51,7 @@ librarian::shelf(httr, terra, tmap, tidyverse) # install and load packages
 ```
 
 # 1. Load Data
-```{r}
+```{r 1. Load Data}
 # 1) Download the public GeoTIFF (v1.2, 2001–2024) from Zenodo
 url <- "https://zenodo.org/records/15366671/files/drivers_forest_loss_1km_2001_2024_v1_2.tif?download=1"  # Zenodo direct
 tif_path <- tempfile(fileext = ".tif")
@@ -57,7 +61,7 @@ stop_for_status(res)
 
 # 2. Investigate data
 
-```{r Arrange Data and Inspect}
+```{r 2. Investigate data}
 # 2) Read the raster
 # Band 1 = dominant class (uint8, 1..7); Bands 2..8 = class probabilities (0..250)
 r_all <- rast(tif_path)
@@ -87,7 +91,7 @@ r <- as.factor(r)        # categorical
 
 Resolution changed to 10 km
 
-```{r}
+```{r 3. Change Resolution}
 # 3) Reproject to Mollweide (categorical -> nearest neighbor)
 #r_moll <- project(r, "ESRI:54009", method = "near")
 #use new projection since many points failed to transform (specify the resolution)
@@ -98,7 +102,7 @@ r_moll
 
 # 4. Binary transformation for high resolution
 
-```{r}
+```{r 4. Binary transformation for high resolution}
 # metadata: -1 = non-ag land, -2 = water/no data  -> set to NA
 r_moll[r_moll %in% c(-1, -2)] <- NA              # keep raw counts for everything else
 names(r_moll) <- "value"
@@ -134,7 +138,7 @@ df_bin <- merge(df, lev, by.x = "value", by.y = "ID", all.x = TRUE)  %>% # set v
 
 
 # 5. Plot
-```{r}
+```{r 5. Plot}
 bin_plot_hr <- ggplot() +
   geom_tile(data = df_bin, aes(x = x, y = y, fill = binary_codes)) +
   geom_sf(data = world_moll, fill = NA, color = "black", linewidth = 0.1) +

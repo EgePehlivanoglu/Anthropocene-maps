@@ -1,0 +1,246 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+Based on Allen 2017 paper
+```{r}
+# Repro map of zoonotic EID hotspots (Allen et al. 2017) in R
+# Packages
+pkgs <- c("terra","sf","rnaturalearth","rnaturalearthdata","tidyterra","ggplot2")
+invisible(lapply(setNames(pkgs, pkgs), function(p) if (!requireNamespace(p, quietly=TRUE)) install.packages(p)))
+library(terra); library(sf); library(rnaturalearth); library(tidyterra); library(ggplot2)
+
+# 1) Download authors' Zenodo archive with data/figures/code
+# (Allen et al. 2017 "hotspots2" v1.0r2)
+eid_risk_relative_to_reporting_effor <- read_csv("Anthropocene-maps/6.Infectious_diseases/eid_risk_relative_to_reporting_effor.csv")
+data <- eid_risk_relative_to_reporting_effor
+```
+
+# Figure 4 
+  
+```{r}
+# Figure 4
+ggplot(data, aes(x = lon, y = lat, fill = bsm_response)) +
+  geom_raster() +
+  viridis:::scale_fill_viridis(
+    option = "viridis",   # matches panel B
+    direction = 1,
+    name = "High"
+  ) +
+  theme_minimal() +
+  theme(
+    panel.background = element_rect(fill = "black"),
+    plot.background  = element_rect(fill = "black"),
+    legend.text  = element_text(color = "white"),
+    legend.title = element_text(color = "white")
+  )
+```
+
+```{r}
+# Convert to raster
+data_raster <- data %>%
+  select(x = lon, y = lat, z = bsm_response) %>%
+  rasterFromXYZ()
+
+# Disaggregate for smoother visualization
+upscaled_raster <- raster::disaggregate(data_raster, 4, method = "bilinear")
+
+# Convert back to data frame for plotting
+pretty <- as.data.frame(upscaled_raster, xy = TRUE) %>% na.omit()
+
+# Clip function
+clip_at_sd <- function(x, multiple = 1) {
+  m <- mean(x, na.rm = TRUE)
+  s <- sd(x, na.rm = TRUE) * multiple
+  pmin(m + s, pmax(m - s, x))
+}
+
+# Create the plot
+ggplot() +
+  geom_raster(aes(x = x, y = y, fill = clip_at_sd(z, 2)), data = pretty) +
+  scale_fill_gradientn(colours = viridis(256)) +
+  coord_fixed() +
+  theme_minimal()
+
+# plot
+ggplot() +
+  geom_tile(data = eid_risk_relative_to_reporting_effor, aes(x = lon, y = lat, fill = bsm_response)) +
+  geom_sf(data = world_moll, fill = NA, color = "black", linewidth = 0.1) +
+  coord_sf() +
+  scale_fill_manual(
+    name = "Disturbance Types",
+    values = c("0" = "seagreen4",  # low risk (example yellow)
+               "1" = "salmon4",  # high risk (example red)
+               "NA" = "white"),  # explicitly map NA to white
+    na.value = "white",           # ensures NAs are white
+    labels = c("0" = "Temporary", "1" = "Permanent")
+  )
+```
+
+# Figure 4 
+  
+```{r}
+# Figure 4
+ggplot(data, aes(x = lon, y = lat, fill = bsm_response)) +
+  geom_raster() +
+  viridis:::scale_fill_viridis(
+    option = "viridis",   # matches panel B
+    direction = 1,
+    name = "High"
+  ) +
+  theme_minimal() +
+  theme(
+    panel.background = element_rect(fill = "black"),
+    plot.background  = element_rect(fill = "black"),
+    legend.text  = element_text(color = "white"),
+    legend.title = element_text(color = "white")
+  )
+```
+
+
+```{r}
+# 2) Try to locate a predicted risk surface produced by the paper (GeoTIFF or ASCII grid)
+rasters <- list.files(unz_dir, pattern = "\\.(tif|tiff|asc|grd)$", recursive = TRUE, full.names = TRUE)
+cand <- rasters[grep("risk|fig3|eid|weighted|bias|response", tolower(rasters))]
+risk_path <- if (length(cand)) cand[1] else rasters[1]  # heuristic fallback
+if (length(risk_path) == 0) stop("No raster found in archive; see fallback notes in code.")
+
+r <- rast(eid_risk_relative_to_reporting_effor)
+
+# 3) Clean and project for pretty mapping (Robinson projection)
+# (some files come as global grid over land; we’ll mask to land polygons for clarity)
+land <- ne_countries(scale = "medium", returnclass = "sf")
+land_r <- st_transform(land, "ESRI:54030")  # Robinson
+r_proj <- project(r, "ESRI:54030", method = "bilinear")
+
+# ocean mask (optional, if the raster includes seas as NA you can skip)
+r_masked <- mask(r_proj, vect(land_r))
+
+# 4) Classify to match GRIDA-style “hotspot” look (top quantiles highlighted)
+q <- quantile(values(r_masked), probs = seq(0, 1, by = 0.1), na.rm = TRUE)
+r_cut <- classify(r_masked, rbind(cbind(q[-length(q)], q[-1], 1:10)))
+
+# 5) Plot ONLY the map (no extra charts)
+g <- ggplot() +
+  geom_spatraster(data = r_cut) +
+  geom_sf(data = land_r, fill = NA, color = "grey30", linewidth = 0.1) +
+  coord_sf(crs = st_crs(land_r)) +
+  scale_fill_viridis_d(name = "EID risk\n(deciles)", direction = 1, na.value = NA) +
+  theme_minimal(base_size = 10) +
+  theme(
+    legend.position = "right",
+    axis.title = element_blank(),
+    axis.text = element_blank(),
+    panel.grid = element_blank(),
+    plot.title = element_text(face = "bold")
+  ) +
+  ggtitle("Predictive hotspots for zoonotic infectious diseases (Allen et al. 2017)")
+
+print(g)
+
+```
+
+```{r}
+# ---- Setup
+pkgs <- c("dplyr","terra","sf","ggplot2","tidyterra","rnaturalearth","rnaturalearthdata")
+invisible(lapply(setNames(pkgs, pkgs), function(p) if (!requireNamespace(p, quietly=TRUE)) install.packages(p)))
+library(dplyr); library(terra); library(sf); library(ggplot2); library(tidyterra); library(rnaturalearth)
+
+base_dir <- list.dirs(unz_dir, full.names = TRUE, recursive = FALSE)
+base_dir <- base_dir[grepl("ecohealthalliance-hotspots2", basename(base_dir))][1]
+
+# ---- Load candidate RData files
+load_one <- function(path) {
+  nm <- load(path, envir = new.env(parent = emptyenv()))
+  get(nm, envir = environment())
+}
+template <- load_one(file.path(base_dir, "data", "template_df.RData"))
+preds    <- load_one(file.path(base_dir, "data", "predictions.RData"))
+
+# ---- Try to identify columns
+# template is usually a data.frame of the global grid (lon/lat + cell id)
+# preds is usually per-cell predictions (risk or response), possibly with same id
+nms_t <- names(template)
+nms_p <- names(preds)
+
+# heuristics for coordinates / id
+x_col <- intersect(nms_t, c("x","lon","longitude")) |> { if (length(.)==0) nms_t[grep("^x$|lon", nms_t, ignore.case=TRUE)][1] else .[1] }
+y_col <- intersect(nms_t, c("y","lat","latitude"))   |> { if (length(.)==0) nms_t[grep("^y$|lat", nms_t, ignore.case=TRUE)][1] else .[1] }
+id_t  <- nms_t[grep("cell|id|index", nms_t, ignore.case=TRUE)][1]
+id_p  <- nms_p[grep("cell|id|index", nms_p, ignore.case=TRUE)][1]
+
+# candidate risk column in predictions
+risk_col <- nms_p[grep("risk|resp|pred|score|weighted", nms_p, ignore.case=TRUE)][1]
+
+stopifnot(!is.na(x_col), !is.na(y_col))
+
+# ---- Join template + predictions
+grid_df <-
+  if (!is.na(id_t) && !is.na(id_p) && id_t %in% nms_t && id_p %in% nms_p) {
+    # join on id
+    template %>% dplyr::select(all_of(c(id_t, x_col, y_col))) %>%
+      dplyr::inner_join(preds %>% dplyr::select(all_of(c(id_p, risk_col))), by = setNames(id_p, id_t))
+  } else if (nrow(preds) == nrow(template)) {
+    # assume same order
+    dplyr::bind_cols(template %>% dplyr::select(all_of(c(x_col, y_col))), preds %>% dplyr::select(all_of(risk_col)))
+  } else {
+    stop("Could not align predictions with the template grid. Inspect names(template) and names(preds).")
+  }
+
+names(grid_df)[names(grid_df) == x_col] <- "x"
+names(grid_df)[names(grid_df) == y_col] <- "y"
+names(grid_df)[names(grid_df) == risk_col] <- "risk"
+
+# ---- Build a terra raster from the regular lon/lat grid
+ux <- sort(unique(grid_df$x))
+uy <- sort(unique(grid_df$y))
+nx <- length(ux); ny <- length(uy)
+r <- rast(ncols = nx, nrows = ny, xmin = min(ux), xmax = max(ux), ymin = min(uy), ymax = max(uy), crs = "EPSG:4326")
+
+# map (x,y) to cell index; y needs to be from top row (max y) to bottom (min y)
+xy_to_rowcol <- function(x, y) c(which(ux == x), which(uy == y))
+# Create a vector of values in row-major order (cols fast, rows slow for terra)
+# terra fills from upper-left to lower-right by rows; we’ll build a matrix indexed by [row, col]
+mat <- matrix(NA_real_, nrow = ny, ncol = nx)
+# faster fill using match
+cx <- match(grid_df$x, ux)
+cy <- match(grid_df$y, uy)
+# flip y to rows from top (max y) to bottom
+ry <- ny - cy + 1
+mat[cbind(ry, cx)] <- grid_df$risk
+values(r) <- as.vector(t(mat))  # convert row-major matrix to terra’s cell vector
+
+# ---- (Optional) project to Robinson or Mollweide for nicer world map
+rob_crs <- "ESRI:54030"   # Robinson. Use "ESRI:54009" for Mollweide.
+r_rob   <- project(r, rob_crs, method = "bilinear")
+
+# mask to land to remove ocean speckle
+land <- rnaturalearth::ne_countries(scale = "medium", returnclass = "sf") |> st_transform(rob_crs)
+r_mask <- mask(r_rob, vect(land))
+
+# ---- Classify and plot ONLY the map
+qs  <- quantile(values(r_mask), probs = seq(0, 1, by = 0.1), na.rm = TRUE)
+r10 <- classify(r_mask, cbind(qs[-11], qs[-1], 1:10))
+
+ggplot() +
+  geom_spatraster(data = r10) +
+  geom_sf(data = land, fill = NA, color = "grey30", linewidth = 0.1) +
+  coord_sf(crs = st_crs(land)) +
+  scale_fill_viridis_d(name = "EID risk (deciles)", na.value = NA) +
+  theme_minimal(base_size = 10) +
+  theme(axis.text = element_blank(), axis.title = element_blank(),
+        panel.grid = element_blank(), legend.position = "right")
+
+```
+```{r}
+src <- file.path(base_dir, "inst", "scripts", "figures_etc", "map_predictions.R")
+source(src, local = TRUE)  # runs in a local env so objects don’t collide
+
+# If the script creates a ggplot object, print it; otherwise it may have saved a file.
+# Look for likely objects and print the first ggplot found:
+objs <- ls()
+ggs  <- objs[sapply(objs, function(o) inherits(get(o), "ggplot"))]
+if (length(ggs)) print(get(ggs[1]))
+
+```
+
