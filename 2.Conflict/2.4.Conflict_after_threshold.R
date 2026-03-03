@@ -12,7 +12,7 @@
 # Load packages
 # install librarian package (working better than pacman)
 # From CRAN:
-install.packages("librarian")
+install.packages("librarian", repos = "https://cloud.r-project.org")
 librarian::shelf(tidyverse, terra, rnaturalearth, sf, maps) # install and load packages
 
 

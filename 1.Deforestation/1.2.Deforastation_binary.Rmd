@@ -1,6 +1,8 @@
 ---
 title: "Deforestation binary"
-output: html_notebook
+output:
+  html_document:
+    df_print: paged
 ---
 
 # Workflow
@@ -45,8 +47,9 @@ Warning: Too many points (529 out of 529) failed to transform, unable to compute
 ```{r Load Packages}
 # install librarian package (working better than pacman)
 # From CRAN:
-install.packages("librarian")
-librarian::shelf(httr, terra, tmap, tidyverse) # install and load packages
+install.packages("librarian", repos = "https://cloud.r-project.org")
+library(librarian)
+shelf(httr, terra, tmap, tidyverse) # install and load packages
 ```
 
 # 1. Load Data

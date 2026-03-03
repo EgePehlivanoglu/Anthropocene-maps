@@ -11,6 +11,10 @@ output: html_notebook
 # 1. Deforestation
 
 ```{r Deforestation}
+setwd("~/Library/CloudStorage/OneDrive-StockholmUniversity/KVA backup/KVAOneDrive_backup_28Jan2026/2. Projects/4.Cascades/Editorial Review 20250807/map/Anthropocene-maps/1.Deforestation/")
+#here::here("1.Deforestation/")
+source(here(file = "1.2.Deforastation_binary.Rmd"))
+rm(list = ls(!%in% c("deforestation_bin"))) # keep only the df_bin object, remove the rest to save memory
 
 ```
 
