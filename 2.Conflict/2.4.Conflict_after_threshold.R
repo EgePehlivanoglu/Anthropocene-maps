@@ -10,9 +10,12 @@
 # So anything below 50th percentile is 0, anything above is 1. 
 
 # Load packages
-# install librarian package (working better than pacman)
+# install librarian package (working better than pacman) quietly
 # From CRAN:
-install.packages("librarian", repos = "https://cloud.r-project.org")
+if (!requireNamespace("librarian", quietly = TRUE)) {
+  install.packages("librarian", repos = "https://cloud.r-project.org")
+}
+library(librarian)
 librarian::shelf(tidyverse, terra, rnaturalearth, sf, maps) # install and load packages
 
 
@@ -159,11 +162,11 @@ conflict_binary_single <- ggplot() +
     legend.text     = element_text(size = 10, face = "bold")
   )
 
-conflict_bin <- df_bin_NAsconverted0
+# Save the plot
+# pdf(file = "q50_bin_NAsconverted0.pdf")
+# conflict_binary_single
+# dev.off()
 
-# pdf(file = "q50_bin_NAsconverted0.pdf")
-# conflict_binary_single
-# dev.off()
-# pdf(file = "q50_bin_NAsconverted0.pdf")
-# conflict_binary_single
-# dev.off()
+# Keep the neccessary datasets for the next steps, remove everything else to save memory
+conflict_bin <- df_bin_NAsconverted0
+conflict_land_sf <- land_sf

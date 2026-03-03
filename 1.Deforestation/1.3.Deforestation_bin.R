@@ -88,4 +88,3 @@ bin_plot_hr <- ggplot() +
   )
 bin_plot_hr
 
-rm(list = ls()[!ls() %in% c("deforestation_bin", "world_moll_deforestation")]) # keep only these two datasets for the next steps, remove everything else to save memorysteps
