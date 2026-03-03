@@ -159,9 +159,11 @@ conflict_binary_single <- ggplot() +
     legend.text     = element_text(size = 10, face = "bold")
   )
 
+conflict_bin <- df_bin_NAsconverted0
+
 # pdf(file = "q50_bin_NAsconverted0.pdf")
 # conflict_binary_single
 # dev.off()
-pdf(file = "q50_bin_NAsconverted0.pdf")
-conflict_binary_single
-dev.off()
+# pdf(file = "q50_bin_NAsconverted0.pdf")
+# conflict_binary_single
+# dev.off()
