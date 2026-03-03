@@ -5,43 +5,64 @@ output:
     df_print: paged
 ---
 
-# Workflow
-# 1. Load data (GeoTIFF from Zenodo)
-# 2. Investigate data (resolution, CRS, extent, dimensions)
-Summary of data:
-Table with the following information:
-r -->
-class       : SpatRaster  -->
-size        : 14000, 36000, 1  (nrow, ncol, nlyr) -->
-resolution  : 0.01, 0.01  (x, y) -->
-extent      : -180, 180, -56, 84  (xmin, xmax, ymin, ymax) -->
-coord. ref. : lon/lat WGS 84 (EPSG:4326)  -->
-source      : spat_80851fac04a7_32901_P2mm2aa9P9QX7pk.tif  -->
-varname     : file808546a31610  -->
-name        : file808546a31610_1  -->
-min value   :                  1  -->
-max value   :                  7  -->
+## Workflow
 
+1. **Load data** (GeoTIFF from Zenodo)
+2. **Inspect the raster** (resolution, CRS, extent, dimensions)
+3. **Reproject to Mollweide** (after adjusting resolution)
+4. **Binary transformation** (permanent vs temporary)
+5. **Plot** (ggplot)
 
-# 3. Change Resolution Reproject to Mollweide
-Resolution is changed because otherwise I receive this watning.
-Warning: Too many points (529 out of 529) failed to transform, unable to compute output bounds. (GDAL error 1)
+---
 
-<!-- r_moll --> -->
-<!-- # <!-- class       : SpatRaster  --> -->
-<!-- # <!-- size        : 1526, 3608, 1  (nrow, ncol, nlyr) --> -->
-<!-- # <!-- resolution  : 10000, 10000  (x, y) --> -->
-<!-- # <!-- extent      : -18040096, 18039904, -6486272, 8773728  (xmin, xmax, ymin, ymax) --> -->
-<!-- # <!-- coord. ref. : +proj=moll +lon_0=0 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs  --> -->
-<!-- # <!-- source(s)   : memory --> -->
-<!-- # <!-- name        : file808546a31610_1  --> -->
-<!-- # <!-- min value   :                  1  --> -->
-<!-- # <!-- max value   :                  7  --> -->
+## 1–2. Data import and quick inspection
 
-# 4. Binary transformation (permanent vs temporary) 
+### Raster summary
 
-# 5. Plot with ggplot
+> **Object:** `r`  
+> **Type:** `SpatRaster` (terra)
 
+| Field | Value |
+|---|---|
+| Class | `SpatRaster` |
+| Size (nrow, ncol, nlyr) | **14000**, **36000**, **1** |
+| Resolution (x, y) | **0.01**, **0.01** |
+| Extent (xmin, xmax, ymin, ymax) | **-180**, **180**, **-56**, **84** |
+| CRS | lon/lat WGS 84 (**EPSG:4326**) |
+| Source | `spat_80851fac04a7_32901_P2mm2aa9P9QX7pk.tif` |
+| Varname | `file808546a31610` |
+| Name | `file808546a31610_1` |
+| Min–Max | **1** – **7** |
+
+---
+
+## 3. Reproject to Mollweide (after changing resolution)
+
+::: {.callout-warning}
+### Why change the resolution first?
+
+Reprojecting directly at **0.01°** caused GDAL to fail to compute output bounds:
+
+> *Warning: Too many points (529 out of 529) failed to transform, unable to compute output bounds. (GDAL error 1)*
+
+To avoid this, the raster is first aggregated / resampled to a coarser grid before reprojection.
+:::
+
+<details>
+<summary><strong>Mollweide raster summary (`r_moll`)</strong></summary>
+
+| Field | Value |
+|---|---|
+| Class | `SpatRaster` |
+| Size (nrow, ncol, nlyr) | **1526**, **3608**, **1** |
+| Resolution (x, y) | **10000**, **10000** |
+| Extent (xmin, xmax, ymin, ymax) | **-18040096**, **18039904**, **-6486272**, **8773728** |
+| CRS | `+proj=moll +lon_0=0 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs` |
+| Source | `memory` |
+| Name | `file808546a31610_1` |
+| Min–Max | **1** – **7** |
+
+</details>
 
 # Load Packages
 ```{r Load Packages}
@@ -49,7 +70,7 @@ Warning: Too many points (529 out of 529) failed to transform, unable to compute
 # From CRAN:
 install.packages("librarian", repos = "https://cloud.r-project.org")
 library(librarian)
-shelf(httr, terra, tmap, tidyverse) # install and load packages
+shelf(httr, terra, tmap, tidyverse, rnaturalearth, sf) # install and load packages
 ```
 
 # 1. Load Data
