@@ -14,8 +14,7 @@ knitr::opts_knit$set(root.dir = "/Users/egepehlivanoglu/Library/CloudStorage/One
 ```{r Deforestation}
 here::here("1.Deforestation/")
 # only run the code
-knitr::purl("1.Deforestation/1.2.Deforestation_binary.Rmd")
-source("1.Deforestation/1.2.Deforestation_binary.R")
+source("1.Deforestation/1.3.Deforestation_bin.R")
 
 
 

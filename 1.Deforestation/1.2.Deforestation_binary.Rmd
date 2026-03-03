@@ -200,3 +200,10 @@ bin_plot_hr
 ```
 
 
+# Optional 
+If you want to extract R chunks automatically to .R script use the code below. 
+
+```{r create a script}
+#knitr::purl("1.Deforestation/1.2.Deforestation_binary.Rmd")
+```
+
