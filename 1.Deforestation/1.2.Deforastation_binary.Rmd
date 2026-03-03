@@ -6,37 +6,36 @@ output: html_notebook
 # Workflow
 # 1. Load data (GeoTIFF from Zenodo)
 # 2. Investigate data (resolution, CRS, extent, dimensions)
-```{r TB, eval=FALSE, include=FALSE}
-# <!-- r -->
-# <!-- class       : SpatRaster  -->
-# <!-- size        : 14000, 36000, 1  (nrow, ncol, nlyr) -->
-# <!-- resolution  : 0.01, 0.01  (x, y) -->
-# <!-- extent      : -180, 180, -56, 84  (xmin, xmax, ymin, ymax) -->
-# <!-- coord. ref. : lon/lat WGS 84 (EPSG:4326)  -->
-# <!-- source      : spat_80851fac04a7_32901_P2mm2aa9P9QX7pk.tif  -->
-# <!-- varname     : file808546a31610  -->
-# <!-- name        : file808546a31610_1  -->
-# <!-- min value   :                  1  -->
-# <!-- max value   :                  7  -->
-```
-
+Summary of data:
+Table with the following information:
+r -->
+class       : SpatRaster  -->
+size        : 14000, 36000, 1  (nrow, ncol, nlyr) -->
+resolution  : 0.01, 0.01  (x, y) -->
+extent      : -180, 180, -56, 84  (xmin, xmax, ymin, ymax) -->
+coord. ref. : lon/lat WGS 84 (EPSG:4326)  -->
+source      : spat_80851fac04a7_32901_P2mm2aa9P9QX7pk.tif  -->
+varname     : file808546a31610  -->
+name        : file808546a31610_1  -->
+min value   :                  1  -->
+max value   :                  7  -->
 
 
 # 3. Change Resolution Reproject to Mollweide
 Resolution is changed because otherwise I receive this watning.
 Warning: Too many points (529 out of 529) failed to transform, unable to compute output bounds. (GDAL error 1)
-```{r TBD2, eval=FALSE, include=FALSE}
-# <!-- r_moll -->
-# <!-- class       : SpatRaster  -->
-# <!-- size        : 1526, 3608, 1  (nrow, ncol, nlyr) -->
-# <!-- resolution  : 10000, 10000  (x, y) -->
-# <!-- extent      : -18040096, 18039904, -6486272, 8773728  (xmin, xmax, ymin, ymax) -->
-# <!-- coord. ref. : +proj=moll +lon_0=0 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs  -->
-# <!-- source(s)   : memory -->
-# <!-- name        : file808546a31610_1  -->
-# <!-- min value   :                  1  -->
-# <!-- max value   :                  7  -->
-```
+
+<!-- r_moll --> -->
+<!-- # <!-- class       : SpatRaster  --> -->
+<!-- # <!-- size        : 1526, 3608, 1  (nrow, ncol, nlyr) --> -->
+<!-- # <!-- resolution  : 10000, 10000  (x, y) --> -->
+<!-- # <!-- extent      : -18040096, 18039904, -6486272, 8773728  (xmin, xmax, ymin, ymax) --> -->
+<!-- # <!-- coord. ref. : +proj=moll +lon_0=0 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs  --> -->
+<!-- # <!-- source(s)   : memory --> -->
+<!-- # <!-- name        : file808546a31610_1  --> -->
+<!-- # <!-- min value   :                  1  --> -->
+<!-- # <!-- max value   :                  7  --> -->
+
 # 4. Binary transformation (permanent vs temporary) 
 
 # 5. Plot with ggplot
@@ -134,6 +133,7 @@ lev <- data.frame(
 df_bin <- merge(df, lev, by.x = "value", by.y = "ID", all.x = TRUE)  %>% # set value as factorial and merge with lev to get name and binary codes
   mutate(name = factor(name, levels = lev$name), # convert name, binary_codes columns to factor
          binary_codes = factor(binary_codes, levels = c(0,1)))
+deforestation_bin <- df_bin
 ```
 
 
