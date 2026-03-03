@@ -54,7 +54,7 @@ df_bin <- merge(df, lev, by.x = "value", by.y = "ID", all.x = TRUE)  %>% # set v
   mutate(name = factor(name, levels = lev$name), # convert name, binary_codes columns to factor
          binary_codes = factor(binary_codes, levels = c(0,1)))
 deforestation_bin <- df_bin
-
+world_moll_deforestation <- world_moll
 # 7) Plotting with ggplot2 ######
 bin_plot_hr <- ggplot() +
   geom_tile(data = df_bin, aes(x = x, y = y, fill = binary_codes)) +
@@ -86,4 +86,4 @@ bin_plot_hr <- ggplot() +
   )
 bin_plot_hr
 
-
+rm(list = ls()[!ls() %in% c("deforestation_bin", "world_moll_deforestation")]) # keep only these two datasets for the next steps, remove everything else to save memorysteps
