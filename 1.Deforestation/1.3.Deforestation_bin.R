@@ -1,6 +1,8 @@
 
 # install librarian package
-install.packages("librarian", repos = "https://cloud.r-project.org")
+if (!requireNamespace("librarian", quietly = TRUE)) {
+  install.packages("librarian", repos = "https://cloud.r-project.org")
+}
 library(librarian)
 shelf(httr, terra, tmap, tidyverse, rnaturalearth, sf) # install and load packages
 
