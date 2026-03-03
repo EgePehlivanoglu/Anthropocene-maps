@@ -64,8 +64,14 @@ To avoid this, the raster is first aggregated / resampled to a coarser grid befo
 
 </details>
 
+# Setup
+```{r setup, include=FALSE}
+knitr::opts_knit$set(root.dir = "/Users/egepehlivanoglu/Library/CloudStorage/OneDrive-StockholmUniversity/KVA backup/KVAOneDrive_backup_28Jan2026/2. Projects/4.Cascades/Editorial Review 20250807/map/Anthropocene-maps/1.Deforestation/")
+```
+
 # Load Packages
 ```{r Load Packages}
+
 # install librarian package (working better than pacman)
 # From CRAN:
 install.packages("librarian", repos = "https://cloud.r-project.org")
