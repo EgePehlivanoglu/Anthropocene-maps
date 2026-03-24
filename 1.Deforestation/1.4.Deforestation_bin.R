@@ -35,7 +35,6 @@ world <- ne_countries(scale = "medium", returnclass = "sf")
 world_moll <- st_transform(world, crs = crs_moll)
 gc() #important so the memory limit is OK
 # 5) Create data frame for ggplot ----
-df <- as.data.frame(r_moll, xy = TRUE, na.rm = TRUE)  # columns: x, y, value
 # Attach human-readable labels from the dataset docs (v1.2)
 # Codes: 1 Perm. agriculture, 2 Hard commodities, 3 Shifting cultivation,
 # 4 Logging, 5 Wildfire, 6 Settlements & infrastructure, 7 Other natural disturbances
@@ -51,16 +50,24 @@ lev <- data.frame(
   binary_codes =c(1,1,1,0,0,0,0)
 )
 
-# 6) Binary Transdormation #######
-df_bin <- merge(df, lev, by.x = "value", by.y = "ID", all.x = TRUE)  %>% # set value as factorial and merge with lev to get name and binary codes
-  mutate(name = factor(name, levels = lev$name), # convert name, binary_codes columns to factor
-         binary_codes = factor(binary_codes, levels = c(0,1)))
-deforestation_bin <- df_bin
-world_moll_deforestation <- world_moll
+# 6) Binary Transformation #######
+# Reclassify the dominant-class raster directly to a binary raster:
+# 1 = permanent disturbances, 0 = temporary disturbances
+r_bin <- classify(
+  r_moll,
+  rcl = cbind(lev$ID, lev$binary_codes)
+)
+names(r_bin) <- "binary_codes"
+
+# Convert the binary raster to a plotting data frame only after classification
+df_bin <- as.data.frame(r_bin, xy = TRUE, na.rm = TRUE) %>%
+  mutate(binary_codes = factor(binary_codes, levels = c(0, 1)))
+
+
 # 7) Plotting with ggplot2 ######
 bin_plot_hr <- ggplot() +
   geom_tile(data = df_bin, aes(x = x, y = y, fill = binary_codes)) +
-  geom_sf(data = world_moll, fill = NA, color = "black", linewidth = 0.1) +
+  geom_sf(data = world_moll, fill = NA, color = "black", linewidth = 0.01) +
   coord_sf() +
   scale_fill_manual(
     name = "Disturbance Types",
@@ -88,3 +95,6 @@ bin_plot_hr <- ggplot() +
   )
 bin_plot_hr
 
+# 8) Save the data ######
+deforestation_bin_SR <- r_bin
+world_moll_deforestation_SR <- world_moll
