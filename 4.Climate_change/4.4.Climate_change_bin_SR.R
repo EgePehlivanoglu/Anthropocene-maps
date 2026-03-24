@@ -56,18 +56,19 @@ r_moll <- project(r_10yr[[nlyr(r_10yr)-1]], mollweide_crs)
 # r_10yr[[nlyr(r_10yr)]] is the last layer, which is 2017-2026
 # note that it is updated now it spans 2016-2025 (first version)
 
-# 6) convert spatraster to a dataframe ---------
+# 6) create binary spatraster ---------
 
 # Create a mask for values greater than 2
 r_anomaly <- clamp(r_moll, lower = 2, value = FALSE)  # Sets values < 2 to NA
-# The value column name is the layer name: "2016-2025"
-val_col <- names(r_anomaly)[1]
-df <- as.data.frame(r_anomaly, xy = TRUE, na.rm = FALSE)  # columns: x, y, value #### important that na.rm is false so it keeps NAs too.
-df_bin <- df %>%
-  mutate(
-    bin = if_else(!is.na(.data[[val_col]]), 1L, 0L, missing = NA)
-  )
-df_bin$bin <- as.factor(df_bin$bin)
+
+# Create a binary SpatRaster:
+# 1 = anomaly > 2C, 0 = anomaly <= 2C or NA in the masked raster
+r_anomaly_bin <- ifel(is.na(r_anomaly), 0, 1)
+names(r_anomaly_bin) <- "bin"
+
+# Convert the binary raster to a data frame only for plotting
+df_bin <- as.data.frame(r_anomaly_bin, xy = TRUE, na.rm = FALSE)
+df_bin$bin <- factor(df_bin$bin, levels = c(0, 1))
 
 # ---- country boundaries -> sf -> Mollweide ----
 world <- ne_countries(scale = "medium", returnclass = "sf")
@@ -85,7 +86,7 @@ bin_climate_change_plot <- ggplot() +
   labs(
     title = "Areas with Anomaly > 2 Degree Celcius (2016-2025)",
     subtitle = "Binary Transformed Data with Mollweide Projection",
-    caption = "Years for 2017-2026, if the increase is more than 2 degree Celcius it is shown in red",
+    caption = "Years for 2016-2025, if the increase is more than 2 degree Celcius it is shown in red",
     x = NULL, y = NULL
   ) 
 
@@ -94,62 +95,6 @@ bin_climate_change_plot <- ggplot() +
 # bin_climate_change_plot
 # dev.off()
 
-## TBC. Investigate data --------
-
-# r_mon is your SpatRaster
-r_mon
-# Resolution (pixel size in map units)
-res(r_mon)
-# CRS / projection (WKT string)
-crs(r_mon)
-# A friendlier summary: EPSG if recognized + proj string
-terra::crs(r_mon, describe=TRUE)
-# Extent (bounding box) in CRS units
-ext(r_mon)
-# Dimensions: nrows, ncols, nlyr
-dim(r_mon)
-# Number of cells
-ncell(r_mon)
-
-# r_10yr is your SpatRaster
-# Resolution (pixel size in map units)
-res(r_10yr)
-# CRS / projection (WKT string)
-crs(r_10yr)
-# A friendlier summary: EPSG if recognized + proj string
-terra::crs(r_10yr, describe=TRUE)
-# Extent (bounding box) in CRS units
-ext(r_10yr)
-# Dimensions: nrows, ncols, nlyr
-dim(r_10yr)
-# Number of cells
-ncell(r_10yr)
-
-# r_10yr is your SpatRaster
-# Resolution (pixel size in map units)
-res(r_moll)
-# CRS / projection (WKT string)
-crs(r_moll)
-# A friendlier summary: EPSG if recognized + proj string
-terra::crs(r_moll, describe=TRUE)
-# Extent (bounding box) in CRS units
-ext(r_moll)
-# Dimensions: nrows, ncols, nlyr
-dim(r_moll)
-# Number of cells
-ncell(r_moll)
-
-# r_anomaly is your SpatRaster
-# Resolution (pixel size in map units)
-res(r_anomaly)
-# CRS / projection (WKT string)
-crs(r_anomaly)
-# A friendlier summary: EPSG if recognized + proj string
-terra::crs(r_anomaly, describe=TRUE)
-# Extent (bounding box) in CRS units
-ext(r_anomaly)
-# Dimensions: nrows, ncols, nlyr
-dim(r_anomaly)
-# Number of cells
-ncell(r_anomaly)
-
+# rename the data for next steps
+clim_change_binSR <- r_anomaly_bin
+world_moll_clim <- world_moll
