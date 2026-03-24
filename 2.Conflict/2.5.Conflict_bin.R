@@ -79,62 +79,31 @@ dim(r)
 ncell(r)
 
 # 1. All NAs excluded
-df_bin <- as.data.frame(bin_sum_land, xy = TRUE, na.rm = TRUE)
 # 2. All 0s excluded
-df_bin_no0 <- df_bin %>%
-  filter(sum != 0) # remove rows where sum == 0
+# 3. create binary values directly on the raster:
+# below threshold 0, above threshold 1
+sum_values <- values(bin_sum_land, na.rm = TRUE)
+sum_values_no0 <- sum_values[sum_values != 0]
 
-# 3. create new columns with below threshold 0, above threshold 1
 # thresholds are decided according to the quantiles (0.5, 0.75, 0.9, 0.95)
-# make it factorial so it is binary not continuous
-df_bin_no0 <- df_bin_no0 %>%             
-  mutate(q50_bin = factor(ifelse(sum < quantile(sum, probs= 0.5), 0, 1)),
-         q75_bin = factor(ifelse(sum < quantile(sum, probs= 0.75), 0, 1)),
-         q90_bin = factor(ifelse(sum < quantile(sum, probs= 0.9), 0, 1)),
-         q95_bin = factor(ifelse(sum < quantile(sum, probs= 0.95), 0, 1))
-  )  
+q50_threshold <- quantile(sum_values_no0, probs = 0.5, na.rm = TRUE)
+
+# Create a binary SpatRaster first, then convert to a plotting data frame only if needed
+r_q50_bin <- ifel(
+  is.na(bin_sum_land),
+  NA,
+  ifel(bin_sum_land == 0, NA, ifel(bin_sum_land < q50_threshold, 0, 1))
+)
+names(r_q50_bin) <- "q50_bin"
+
+df_bin <- as.data.frame(r_q50_bin, xy = TRUE, na.rm = TRUE) %>%
+  mutate(q50_bin = factor(q50_bin, levels = c(0, 1)))
+
 # Plot ############
-
-p_50 <- ggplot() +
-  geom_tile(data = df_bin_no0, aes(x = x, y = y, fill = q50_bin)) +
-  geom_sf(data = land_sf, fill = NA, color = "lightgray", linewidth = 0.1) +
-  coord_sf(crs = st_crs(crs_moll), expand = FALSE) +
-  scale_fill_manual(values = c("0" = "#F8766D", "1" = "#00BFC4"),  
-                    limits = c("0","1"),        # keep order
-                    drop   = FALSE,             # show both even if one is absent
-                    name = "Sum of Deaths",
-                    labels = c("0" = "< threshold", "1" = "≥ threshold")) +
-  labs(
-    title = "Organized Violence (sum of estimated deaths)",
-    subtitle = sprintf("2000-2024 • %dkm equal-area grid", cell_km),
-    caption = "Projection: Mollweide (equal-area). Values included after 50th percentile."
-  ) + 
-  xlab("longitude") +
-  ylab("latitude") +
-  theme_minimal(base_size = 12) +
-  theme(
-    plot.title      = element_text(face = "bold", size = 14),
-    plot.subtitle   = element_text(size = 9, margin = margin(b = 6)),
-    plot.caption    = element_text(size = 9, color = "#666666"),
-    legend.position = "right",
-    legend.title    = element_text(size = 11, face = "bold"),
-    legend.text     = element_text(size = 10, face = "bold")
-  )
-p_50
-# pdf(file = "q50_bin.pdf")
-# p_50
-# dev.off()
-# Save df
-conflict_bin_df <- df_bin_no0 %>% select(c("x", "y", "q50_bin"))
-
-# rm(list=setdiff(ls(), c("conflict_bin_df")))
-
-
-# 4th of February
-# MAKE NAs 0 also ######
+# MAKE NAs 0 also #
 
 ### this is only for visualisation dataset hasn't changed
-df_bin_NAsconverted0 <- df_bin_no0 %>% select(c(x,y, q50_bin)) %>% filter(q50_bin==1)
+df_bin_NAsconverted0 <- df_bin %>% select(c(x, y, q50_bin)) %>% filter(q50_bin == 1)
 
 conflict_binary_single <- ggplot() +
   geom_tile(data = df_bin_NAsconverted0, aes(x = x, y = y, fill = q50_bin)) +
@@ -168,5 +137,5 @@ conflict_binary_single <- ggplot() +
 # dev.off()
 
 # Keep the neccessary datasets for the next steps, remove everything else to save memory
-conflict_bin <- df_bin_NAsconverted0
-conflict_land_sf <- land_sf
+conflict_bin_SR <- r_q50_bin
+conflict_land_sf_SR <- land_sf
