@@ -94,3 +94,7 @@ bin_climate_change_plot <- ggplot() +
 # pdf(file = "binary climate change plot2016-25.pdf")
 # bin_climate_change_plot
 # dev.off()
+
+# rename the data for next steps
+clim_change_binSR <- r_anomaly_bin
+world_moll_clim <- world_moll
