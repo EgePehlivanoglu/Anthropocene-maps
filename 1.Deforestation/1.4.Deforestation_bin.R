@@ -63,12 +63,11 @@ names(r_bin) <- "binary_codes"
 df_bin <- as.data.frame(r_bin, xy = TRUE, na.rm = TRUE) %>%
   mutate(binary_codes = factor(binary_codes, levels = c(0, 1)))
 
-deforestation_bin <- r_bin
-world_moll_deforestation <- world_moll
+
 # 7) Plotting with ggplot2 ######
 bin_plot_hr <- ggplot() +
   geom_tile(data = df_bin, aes(x = x, y = y, fill = binary_codes)) +
-  geom_sf(data = world_moll, fill = NA, color = "black", linewidth = 0.1) +
+  geom_sf(data = world_moll, fill = NA, color = "black", linewidth = 0.01) +
   coord_sf() +
   scale_fill_manual(
     name = "Disturbance Types",
@@ -95,3 +94,7 @@ bin_plot_hr <- ggplot() +
     legend.text = element_text(size = 9)
   )
 bin_plot_hr
+
+# 8) Save the data ######
+deforestation_bin_SR <- r_bin
+world_moll_deforestation_SR <- world_moll
