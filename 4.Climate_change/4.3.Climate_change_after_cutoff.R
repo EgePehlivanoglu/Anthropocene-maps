@@ -51,16 +51,16 @@ names(r_10yr) <- apply(
 
 # Reproject the raster to Mollweide projection
 mollweide_crs <- "+proj=moll +lon_0=0 +x_0=0 +y_0=0 +ellps=WGS84 +datum=WGS84 +units=m +no_defs"
-r_moll <- project(r_10yr[[nlyr(r_10yr)]], mollweide_crs)
+r_moll <- project(r_10yr[[nlyr(r_10yr)-1]], mollweide_crs)
 
-# r_10yr[[nlyr(r_10yr)]] 
-# note that it is updated now it spans 2017-2026 and hence the middle of russia is blank.
+# r_10yr[[nlyr(r_10yr)]] is the last layer, which is 2017-2026
+# note that it is updated now it spans 2016-2025 (first version)
 
 # 6) convert spatraster to a dataframe ---------
 
 # Create a mask for values greater than 2
 r_anomaly <- clamp(r_moll, lower = 2, value = FALSE)  # Sets values < 2 to NA
-# The value column name is the layer name: "2017-2026"
+# The value column name is the layer name: "2016-2025"
 val_col <- names(r_anomaly)[1]
 df <- as.data.frame(r_anomaly, xy = TRUE, na.rm = FALSE)  # columns: x, y, value #### important that na.rm is false so it keeps NAs too.
 df_bin <- df %>%
@@ -83,16 +83,16 @@ bin_climate_change_plot <- ggplot() +
   labs(x = NULL, y = NULL) +
   theme_minimal() +
   labs(
-    title = "Areas with Anomaly > 2 Degree Celcius (2017-2026)",
+    title = "Areas with Anomaly > 2 Degree Celcius (2016-2025)",
     subtitle = "Binary Transformed Data with Mollweide Projection",
     caption = "Years for 2017-2026, if the increase is more than 2 degree Celcius it is shown in red",
     x = NULL, y = NULL
   ) 
 
 # save the plot in pdf
-# pdf(file = "binary climate change plot2017-26.pdf")
-# bin_climate_change_plot
-# dev.off()
+pdf(file = "binary climate change plot2016-25.pdf")
+ bin_climate_change_plot
+ dev.off()
 
 ## TBC. Investigate data --------
 
