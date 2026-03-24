@@ -91,8 +91,8 @@ bin_climate_change_plot <- ggplot() +
 
 # save the plot in pdf
 pdf(file = "binary climate change plot2016-25.pdf")
- bin_climate_change_plot
- dev.off()
+bin_climate_change_plot
+dev.off()
 
 ## TBC. Investigate data --------
 
