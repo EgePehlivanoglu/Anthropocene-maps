@@ -16,7 +16,8 @@ here::here("1.Deforestation/")
 # only run the code
 source("1.Deforestation/1.3.Deforestation_bin.R")
 
-deforestation_bin_new <- deforestation_bin %>% select(x, y, binary_codes) %>% rename(value = binary_codes) # select only x, y, binary_codes columns and rename binary_codes to value for consistency with conflict dataset
+
+
 ```
 
 # 2. Conflict
@@ -24,31 +25,10 @@ deforestation_bin_new <- deforestation_bin %>% select(x, y, binary_codes) %>% re
 ```{r Conflict}
 # source the file for conflict (after threshold)
 source(file = "2.Conflict/2.4.Conflict_after_threshold.R")
-rm(list = ls()[!ls() %in% c("deforestation_bin", "world_moll_deforestation", "conflict_bin", "conflict_land_sf")]) # keep only these two datasets for the next steps, remove everything else to save memorysteps
-conflict_bin_new <- conflict_bin %>% select(x, y, q50_bin) %>% rename(value = q50_bin) # select only x, y, q50_bin columns and rename q50_bin to value for consistency with deforestation dataset
+rm(list = ls()[!ls() %in% "conflict_bin"])
+
 ```
 
-# Sum 1 and 2
-
-```{r}
-
-# sum the two datasets (deforestation and conflict)
-# make sure they have the same extent and resolution
-# if not, resample one to match the other (e.g., using terra::res
-# here we assume conflict_bin is the one to resample to match deforestation_bin
-new_df <- terra::resample(conflict_bin, deforestation_bin, method= "near") # use nearest neighbor for categorical data
-# now sum 
-deforestation_bin_new$value <- as.numeric(as.character(deforestation_bin_new$value))
-conflict_bin_new$value      <- as.numeric(as.character(conflict_bin_new$value))
-# 
-# combined <- deforestation_bin_new %>%
-#   left_join(conflict_bin_new, by = c("x", "y"),
-#             suffix = c("_def", "_conf")) %>%
-#   mutate(
-#     value_conf = ifelse(is.na(value_conf), 0, value_conf),
-#     sum_value  = value_def + value_conf
-  
-```
 
 # 4. Climate Change
 ```{r Climate Change}
