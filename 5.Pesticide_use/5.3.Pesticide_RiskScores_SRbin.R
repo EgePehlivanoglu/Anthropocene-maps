@@ -17,7 +17,7 @@ librarian::shelf(raster,       # for raster data handling
 
 # Binary Global pesticide risk scores ########
 # *Assumptions*
-# + Value for non-agricultural land: -1, Value for water/no data: -2 given NA
+#   + Value for non-agricultural land: -1, Value for water/no data: -2 given NA
 # + Give NA to non-agricultural land (previously 0 on the original figure)
 # + Give 0 for values low to medium (until 3)
 # + Give 1 for values high (3 or above)
@@ -74,12 +74,19 @@ world <- ne_countries(scale = "medium", returnclass = "sf")
 world_moll <- st_transform(world, crs = crs_moll)
 
 # ---- 3. binary transformation ----
-df <- as.data.frame(r_moll, xy = TRUE, na.rm = TRUE)  # columns: x, y, value
+# Create a binary SpatRaster first:
+# 0 = low to medium risk (<3), 1 = high risk (>=3), NA stays NA
+r_bin <- ifel(
+  is.na(r_moll) | r_moll == 0,
+  NA,
+  ifel(r_moll < 3, 0, 1)
+)
+names(r_bin) <- "RS_bin"
 
-df_bin <- df %>% 
-  mutate(RS_bin= case_when(value == 0 ~ NA,
-                           value >0 & value <3  ~ "0",  
-                           value >=3 ~ "1"), factor(RS_bin))
+
+# Convert the binary raster to a data frame only for plotting
+df_bin <- as.data.frame(r_bin, xy = TRUE, na.rm = TRUE) %>%
+  mutate(RS_bin = factor(RS_bin, levels = c(0, 1)))
 
 # ----- 4. plotting ----
 bin_plot <- ggplot() +
@@ -113,7 +120,8 @@ bin_plot <- ggplot() +
 
 
 # ---- save (optional) ----
-ggsave("bin_riskscores.png", bin_plot, width = 11, height = 6.5, dpi = 300)
+#ggsave("binfromSR_riskscores.png", bin_plot, width = 11, height = 6.5, dpi = 300)
 
-
-
+# ---Save data ###
+pesticide_SR_bin <- r_bin
+pesticide_world_moll <- world_moll
