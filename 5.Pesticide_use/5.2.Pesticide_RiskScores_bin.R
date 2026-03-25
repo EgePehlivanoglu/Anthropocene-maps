@@ -84,7 +84,7 @@ df_bin <- df %>%
 # ----- 4. plotting ----
 bin_plot <- ggplot() +
   geom_tile(data = df_bin, aes(x = x, y = y, fill = RS_bin)) +
-  geom_sf(data = world_moll, fill = NA, color = "black", linewidth = 0.2) +
+  geom_sf(data = world_moll, fill = NA, color = "black", linewidth = 0.1) +
   coord_sf() +
   scale_fill_manual(
     name = "Binary Risk Score",
@@ -113,7 +113,7 @@ bin_plot <- ggplot() +
 
 
 # ---- save (optional) ----
-# ggsave("binary_rs_mollweide.png", bin_plot, width = 11, height = 6.5, dpi = 300)
+ggsave("bin_riskscores.png", bin_plot, width = 11, height = 6.5, dpi = 300)
 
 
 
