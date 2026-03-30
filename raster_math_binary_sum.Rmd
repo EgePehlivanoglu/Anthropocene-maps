@@ -1,0 +1,175 @@
+---
+title: "Summed Binary SpatRaster Map"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+
+project_root <- "/Users/egepehlivanoglu/Library/CloudStorage/OneDrive-StockholmUniversity/KVA backup/KVAOneDrive_backup_28Jan2026/2. Projects/4.Cascades/Editorial Review 20250807/map/Anthropocene-maps"
+knitr::opts_knit$set(root.dir = project_root)
+
+library(terra)
+library(sf)
+library(ggplot2)
+library(dplyr)
+library(rnaturalearth)
+
+source_and_keep <- function(script_path, keep_names) {
+  env <- new.env(parent = globalenv())
+  sys.source(script_path, envir = env)
+  rm(list = setdiff(ls(envir = env), keep_names), envir = env)
+  env
+}
+
+binary_to_zero <- function(r) {
+  ifel(is.na(r), 0, r)
+}
+```
+
+# Purpose
+
+This document sources the latest binary raster workflows and sums the binary `SpatRaster` outputs into one composite map.
+
+Because raster math requires aligned grids, all rasters are first reprojected/resampled to a common Mollweide template. To avoid creating false precision, the common template uses the **coarsest resolution** among the input rasters.
+
+# 1. Source the binary rasters
+
+```{r source-rasters}
+deforestation_env <- source_and_keep(
+  "1.Deforestation/1.4.Deforestation_bin.R",
+  c("deforestation_bin_SR", "world_moll_deforestation_SR")
+)
+
+conflict_env <- source_and_keep(
+  "2.Conflict/2.5.Conflict_bin.R",
+  c("conflict_bin_SR", "conflict_land_sf_SR")
+)
+
+climate_env <- source_and_keep(
+  "4.Climate_change/4.4.Climate_change_bin_SR.R",
+  c("clim_change_binSR", "world_moll_clim")
+)
+
+pesticide_env <- source_and_keep(
+  "5.Pesticide_use/5.3.Pesticide_RiskScores_SRbin.R",
+  c("pesticide_SR_bin", "pesticide_world_moll")
+)
+
+r_list <- list(
+  deforestation = get("deforestation_bin_SR", envir = deforestation_env),
+  conflict = get("conflict_bin_SR", envir = conflict_env),
+  climate = get("clim_change_binSR", envir = climate_env),
+  pesticide = get("pesticide_SR_bin", envir = pesticide_env)
+)
+```
+
+# 2. Check CRS and resolution
+
+```{r inspect-geometry}
+raster_geometry <- tibble(
+  dataset = names(r_list),
+  crs = vapply(r_list, terra::crs, character(1)),
+  res_x = vapply(r_list, function(r) terra::res(r)[1], numeric(1)),
+  res_y = vapply(r_list, function(r) terra::res(r)[2], numeric(1)),
+  xmin = vapply(r_list, function(r) terra::ext(r)[1], numeric(1)),
+  xmax = vapply(r_list, function(r) terra::ext(r)[2], numeric(1)),
+  ymin = vapply(r_list, function(r) terra::ext(r)[3], numeric(1)),
+  ymax = vapply(r_list, function(r) terra::ext(r)[4], numeric(1))
+)
+
+raster_geometry
+```
+
+# 3. Create a common raster template
+
+```{r common-template}
+target_crs <- terra::crs(r_list$deforestation)
+target_res <- c(
+  max(vapply(r_list, function(r) terra::res(r)[1], numeric(1))),
+  max(vapply(r_list, function(r) terra::res(r)[2], numeric(1)))
+)
+
+target_extent <- terra::ext(
+  min(vapply(r_list, function(r) terra::ext(r)[1], numeric(1))),
+  max(vapply(r_list, function(r) terra::ext(r)[2], numeric(1))),
+  min(vapply(r_list, function(r) terra::ext(r)[3], numeric(1))),
+  max(vapply(r_list, function(r) terra::ext(r)[4], numeric(1)))
+)
+
+template_raster <- terra::rast(
+  ext = target_extent,
+  resolution = target_res,
+  crs = target_crs
+)
+
+template_raster
+```
+
+# 4. Align rasters before raster math
+
+```{r align-rasters}
+r_aligned <- lapply(r_list, function(r) {
+  terra::resample(r, template_raster, method = "near")
+})
+
+r_aligned_zero <- lapply(r_aligned, binary_to_zero)
+```
+
+# 5. Sum the binary rasters
+
+```{r sum-rasters}
+binary_sum <- Reduce(`+`, r_aligned_zero)
+names(binary_sum) <- "sum_binary"
+
+binary_sum_df <- as.data.frame(binary_sum, xy = TRUE, na.rm = FALSE)
+```
+
+# 6. Plot in Mollweide projection
+
+```{r plot-sum}
+world_moll <- sf::st_transform(
+  rnaturalearth::ne_countries(scale = "medium", returnclass = "sf"),
+  crs = target_crs
+)
+
+binary_sum_plot <- ggplot() +
+  geom_tile(
+    data = binary_sum_df,
+    aes(x = x, y = y, fill = sum_binary)
+  ) +
+  geom_sf(
+    data = world_moll,
+    fill = NA,
+    color = "black",
+    linewidth = 0.1
+  ) +
+  coord_sf(crs = st_crs(target_crs), expand = FALSE) +
+  scale_fill_viridis_c(
+    option = "C",
+    na.value = "white",
+    name = "Count of\nbinary layers"
+  ) +
+  labs(
+    title = "Summed Binary Raster Math Surface",
+    subtitle = "Deforestation + Conflict + Climate Change + Pesticide Use",
+    caption = "All binary rasters aligned to a common Mollweide template using the coarsest input resolution before summation.",
+    x = NULL,
+    y = NULL
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(
+    panel.grid = element_blank(),
+    legend.position = "right",
+    legend.title = element_text(face = "bold")
+  )
+
+binary_sum_plot
+```
+
+# 7. Final output objects
+
+```{r final-objects}
+binary_sum
+target_res
+```
