@@ -3,111 +3,108 @@
 # Fig. 3B = weighted model output reweighted by population
 # Variable used here: bsm_weight_pop
 
-# install librarian package quietly if needed
 if (!requireNamespace("librarian", quietly = TRUE)) {
   install.packages("librarian", repos = "https://cloud.r-project.org")
 }
 
 library(librarian)
-shelf(terra, sf, rnaturalearth, tidyverse, viridis)
+shelf(raster, terra, sf, sp, rnaturalearth, tidyverse, viridis, maps)
 
 # ---- 1) load archived model predictions ----
 predictions_path <- "~/Library/CloudStorage/OneDrive-StockholmUniversity/KVA backup/KVAOneDrive_backup_28Jan2026/2. Projects/4.Cascades/Editorial Review 20250807/map/Base maps/6.Infectious_diseases/Allen 2017/predictions.RData"
 stopifnot(file.exists(path.expand(predictions_path)))
-
 load(path.expand(predictions_path))  # loads object: predictions
 
-eid_pred <- predictions %>%
-  select(gridid, lon, lat, bsm_weight_pop) %>%
-  filter(is.finite(lon), is.finite(lat), is.finite(bsm_weight_pop))
+predictions <- predictions %>%
+  dplyr::select(gridid, lon, lat, bsm_weight_pop) %>%
+  dplyr::filter(is.finite(lon), is.finite(lat), is.finite(bsm_weight_pop))
 
-# ---- 2) build raster from the archived grid ----
-r_eid <- terra::rast(
-  eid_pred[, c("lon", "lat", "bsm_weight_pop")],
-  type = "xyz",
-  crs = "EPSG:4326"
+# ---- 2) helper functions following the authors' workflow ----
+clip_at_sd <- function(x, multiple = 1) {
+  m <- mean(x, na.rm = TRUE)
+  s <- sd(x, na.rm = TRUE) * multiple
+  x %>%
+    pmin(m + s) %>%
+    pmax(m - s)
+}
+
+template_raster <- function(df) {
+  template_df <- df %>%
+    dplyr::select(lon, lat, gridid)
+  sp::coordinates(template_df) <- c("lon", "lat")
+  sp::gridded(template_df) <- TRUE
+  sp::proj4string(template_df) <- sp::CRS("+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0")
+  raster::raster(template_df)
+}
+
+# ---- 3) clip values to +/- 2.5 SD, as in the figure caption ----
+predictions$bsm_weight_pop_clipped <- clip_at_sd(predictions$bsm_weight_pop, 2.5)
+
+# ---- 4) build the raster the way the authors' scripts do ----
+country_outlines <- terra::vect(
+  sf::st_transform(
+    ne_countries(scale = "medium", returnclass = "sf"),
+    crs = "EPSG:4326"
+  )
 )
-names(r_eid) <- "bsm_weight_pop"
 
-# ---- 3) standard deviation scaling used in the paper ----
-# Fig. 3 caption: palette scaled to 2.5 SD above and below the mean
-eid_vals <- values(r_eid, na.rm = TRUE)
-eid_mean <- mean(eid_vals, na.rm = TRUE)
-eid_sd <- sd(eid_vals, na.rm = TRUE)
-eid_min <- eid_mean - 2.5 * eid_sd
-eid_max <- eid_mean + 2.5 * eid_sd
+fig3b_raster <- predictions %>%
+  dplyr::select(x = lon, y = lat, z = bsm_weight_pop_clipped) %>%
+  raster::rasterFromXYZ(crs = raster::crs(template_raster(predictions))) %>%
+  raster::disaggregate(2, method = "bilinear")
 
-r_eid_scaled <- clamp(r_eid, lower = eid_min, upper = eid_max, values = TRUE)
+fig3b_raster <- terra::rast(fig3b_raster)
+terra::crs(fig3b_raster) <- "EPSG:4326"
+fig3b_raster <- terra::mask(fig3b_raster, country_outlines)
+names(fig3b_raster) <- "risk"
 
-# ---- 4) convert to plotting data ----
-eid_df <- as.data.frame(r_eid_scaled, xy = TRUE, na.rm = TRUE)
+fig3b_df <- as.data.frame(fig3b_raster, xy = TRUE) %>%
+  stats::na.omit()
 
-# ---- 5) country boundaries ----
-world <- ne_countries(scale = "medium", returnclass = "sf")
+numcolors <- length(unique(fig3b_df$risk))
+world_df <- ggplot2::map_data("world")
 
-# ---- 6) plot ----
-# Land mask (so country borders are visible)
-land_sf     <- ne_countries(scale = "medium", returnclass = "sf") 
+# ---- 5) plot ----
 fig_3b_plot <- ggplot() +
-  geom_raster(data = eid_df, aes(x = x, y = y, fill = bsm_weight_pop)) +
-  geom_sf(data =land_sf, fill = NA, color = "white", size = 0.15) +
-  #  coord_fixed() +
-  ylim(-65, 90) +
-  scale_fill_gradientn(colours = viridis(100),
-                       guide = guide_colorbar(label = TRUE,
-                                              label.position = "right",
-                                              title = "Event probability\n(relative to\nreporting effort)")) +
-  #  theme_black_legend() +
-  theme(panel.background = element_rect(fill = "black"),
-        plot.background  = element_rect(fill = "black"),
-        line = element_blank(),
-        legend.title = element_text(color = "white", size = 8),
-        legend.text = element_text(color = "white", size = 8),
-        legend.title.align = 0,
-        legend.background = element_blank(),
-        legend.position = c(0.11, 0.45)) +
+  geom_polygon(
+    aes(x = long, y = lat, group = group),
+    data = world_df,
+    inherit.aes = FALSE,
+    fill = viridis::viridis(1)
+  ) +
+  geom_raster(
+    aes(x = x, y = y, fill = risk),
+    data = fig3b_df
+  ) +
+  geom_path(
+    aes(x = long, y = lat, group = group),
+    data = world_df,
+    inherit.aes = FALSE,
+    color = "white",
+    linewidth = 0.15
+  ) +
+  coord_fixed(xlim = c(-180, 180), ylim = c(-65, 90), expand = FALSE) +
+  scale_fill_gradientn(
+    colours = viridis::viridis(numcolors),
+    guide = guide_colorbar(
+      label = TRUE,
+      label.position = "right",
+      title = "EID Risk Index"
+    )
+  ) +
+  theme(
+    panel.background = element_rect(fill = "black"),
+    plot.background = element_rect(fill = "black"),
+    line = element_blank(),
+    legend.title = element_text(color = "white", size = 8),
+    legend.text = element_text(color = "white", size = 8),
+    legend.title.align = 0,
+    legend.background = element_blank(),
+    legend.position = c(0.11, 0.45)
+  ) +
   labs(x = NULL, y = NULL)
-
-  # geom_sf(data = world, fill = NA, color = "white", linewidth = 0.15) +
-  # coord_sf(
-  #   xlim = c(-180, 180),
-  #   ylim = c(-65, 90),
-  #   expand = FALSE
-  # ) +
-  # scale_fill_gradientn(
-  #   colours = viridis::viridis(256, option = "D", direction = 1),
-  #   limits = c(eid_min, eid_max),
-  #   oob = scales::squish,
-  #   guide = guide_colorbar(
-  #     title = "High",
-  #     label.position = "right",
-  #     barheight = unit(6, "cm")
-  #   )
-  # ) +
-  # labs(
-  #   title = "Predicted relative risk distribution of zoonotic emerging infectious diseases",
-  #   subtitle = "Figure 3B reproduction after factoring out reporting bias",
-  #   caption = "Based on Allen et al. (2017); weighted model output reweighted by population, scaled to +/- 2.5 SD around the mean.",
-  #   x = NULL,
-  #   y = NULL
-  # ) +
-  # theme_minimal(base_size = 11) +
-  # theme(
-  #   panel.background = element_rect(fill = "black", color = NA),
-  #   plot.background = element_rect(fill = "black", color = NA),
-  #   panel.grid = element_blank(),
-  #   axis.text = element_blank(),
-  #   axis.ticks = element_blank(),
-  #   legend.position = c(0.11, 0.45),
-  #   legend.title = element_text(color = "white", size = 8),
-  #   legend.text = element_text(color = "white", size = 8),
-  #   legend.background = element_blank(),
-  #   plot.title = element_text(color = "white", face = "bold"),
-  #   plot.subtitle = element_text(color = "white"),
-  #   plot.caption = element_text(color = "white")
-  # )
 
 fig_3b_plot
 
-# ---- 7) optional save ----
+# ---- 6) optional save ----
 # ggsave("fig_3b_infectious_diseases.png", fig_3b_plot, width = 11, height = 6.5, dpi = 300)
