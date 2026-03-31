@@ -33,6 +33,48 @@ This document sources the latest binary raster workflows and sums the binary `Sp
 
 Because raster math requires aligned grids, all rasters are first reprojected/resampled to a common Mollweide template. To avoid creating false precision, the common template uses the **coarsest resolution** among the input rasters.
 
+The summed raster should therefore be interpreted as a **stacked binary pressure surface** rather than as a continuous environmental index. Each input contributes either `0` or `1` at a given aligned grid cell, and the final value records how many of the four mapped processes are present in that cell after harmonisation.
+
+# Assumptions Carried Forward From the Individual Workflows
+
+## Deforestation
+
+- The source raster is the dominant driver-of-forest-loss layer.
+- Only valid class IDs `1-7` are retained.
+- Non-agricultural land and water/no-data values are set to `NA`.
+- Binary coding is:
+  - `1` = permanent disturbances
+  - `0` = temporary disturbances
+
+## Conflict
+
+- The starting raster is the land-masked sum of conflict deaths/intensity (`r_sum_land` / `bin_sum_land`).
+- `NA` cells remain excluded.
+- Zero-value cells are excluded before thresholding.
+- The binary raster uses the 50th percentile of the non-zero distribution:
+  - `1` = at or above the threshold
+  - `0` = below the threshold
+
+## Climate Change
+
+- The source raster is the most recent 10-year running-mean anomaly layer in the workflow.
+- A `> 2°C` cutoff is used.
+- Binary coding is:
+  - `1` = anomaly greater than `2°C`
+  - `0` = anomaly less than or equal to `2°C` or treated as absence in the masked output
+
+## Pesticide Use
+
+- Non-agricultural land (`-1`) and water/no-data (`-2`) are set to `NA`.
+- Cells with value `0` are also treated as `NA` in the binary transformation.
+- Binary coding is:
+  - `1` = high pesticide risk (`>= 3`)
+  - `0` = low to medium pesticide risk (`> 0` and `< 3`)
+
+# Interpretation Note
+
+This summed map combines binary layers that were created from **different source datasets, thresholds, and meanings**. A higher summed value does **not** mean that the underlying processes are directly comparable in magnitude. Instead, it indicates that more binary conditions are present in the same aligned grid cell.
+
 # 1. Source the binary rasters
 
 ```{r source-rasters}
@@ -66,6 +108,8 @@ r_list <- list(
 
 # 2. Check CRS and resolution
 
+This step is especially important for presentation and interpretation. Even when all outputs are in Mollweide, they do not necessarily share the same resolution or exact grid alignment. Raster math should only be done after this check.
+
 ```{r inspect-geometry}
 raster_geometry <- tibble(
   dataset = names(r_list),
@@ -82,6 +126,8 @@ raster_geometry
 ```
 
 # 3. Create a common raster template
+
+To keep the raster math conservative, the common template uses the **coarsest input resolution**. This avoids artificially increasing the apparent detail of coarser datasets during alignment.
 
 ```{r common-template}
 target_crs <- terra::crs(r_list$deforestation)
@@ -108,6 +154,8 @@ template_raster
 
 # 4. Align rasters before raster math
 
+Nearest-neighbor resampling is used here because all four inputs are binary rasters. This preserves binary class membership during alignment.
+
 ```{r align-rasters}
 r_aligned <- lapply(r_list, function(r) {
   terra::resample(r, template_raster, method = "near")
@@ -118,14 +166,27 @@ r_aligned_zero <- lapply(r_aligned, binary_to_zero)
 
 # 5. Sum the binary rasters
 
+For the summation step, `NA` values are converted to `0`. In other words, missing or excluded cells do not add to the combined count.
+
 ```{r sum-rasters}
 binary_sum <- Reduce(`+`, r_aligned_zero)
 names(binary_sum) <- "sum_binary"
 
 binary_sum_df <- as.data.frame(binary_sum, xy = TRUE, na.rm = FALSE)
+binary_sum_df <- binary_sum_df %>%
+  mutate(
+    sum_binary_cat = case_when(
+      is.na(sum_binary) ~ NA_real_,
+      sum_binary >= 3 ~ 3,
+      TRUE ~ sum_binary
+    ),
+    sum_binary_cat = factor(sum_binary_cat, levels = c(0, 1, 2, 3))
+  )
 ```
 
 # 6. Plot in Mollweide projection
+
+The map below is therefore best read as the **number of binary layers present per aligned cell** after all four workflows have been harmonised to one common raster geometry.
 
 ```{r plot-sum}
 world_moll <- sf::st_transform(
@@ -136,7 +197,7 @@ world_moll <- sf::st_transform(
 binary_sum_plot <- ggplot() +
   geom_tile(
     data = binary_sum_df,
-    aes(x = x, y = y, fill = sum_binary)
+    aes(x = x, y = y, fill = sum_binary_cat)
   ) +
   geom_sf(
     data = world_moll,
@@ -145,15 +206,21 @@ binary_sum_plot <- ggplot() +
     linewidth = 0.1
   ) +
   coord_sf(crs = st_crs(target_crs), expand = FALSE) +
-  scale_fill_viridis_c(
-    option = "C",
+  scale_fill_manual(
+    values = c(
+      "0" = "#f7f7f7",
+      "1" = "#fdd49e",
+      "2" = "#fc8d59",
+      "3" = "#b30000"
+    ),
     na.value = "white",
-    name = "Count of\nbinary layers"
+    name = "Count of\nbinary layers",
+    labels = c("0", "1", "2", "3")
   ) +
   labs(
-    title = "Summed Binary Raster Math Surface",
-    subtitle = "Deforestation + Conflict + Climate Change + Pesticide Use",
-    caption = "All binary rasters aligned to a common Mollweide template using the coarsest input resolution before summation.",
+    title = "Summed Binary Raster Pressure Surface",
+    subtitle = "Deforestation, conflict, climate change, and pesticide use aligned in Mollweide projection",
+    caption = "All binary rasters were aligned to a common Mollweide template using the coarsest input resolution before summation. Legend values are discrete counts; the top class (3) groups cells with three or more layers present.",
     x = NULL,
     y = NULL
   ) +
@@ -168,6 +235,8 @@ binary_sum_plot
 ```
 
 # 7. Final output objects
+
+These are the key outputs from the workflow: the summed raster and the chosen target resolution used for harmonisation.
 
 ```{r final-objects}
 binary_sum

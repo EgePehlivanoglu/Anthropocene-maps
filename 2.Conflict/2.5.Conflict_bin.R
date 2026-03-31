@@ -27,7 +27,7 @@ GEDEvent_v25_1 <- GEDEvent_v25_1 <- readRDS("~/Library/CloudStorage/OneDrive-Sto
 ### Parameters # -----------------------------
 sum_field    <- "best"            # "best", "high", "low", etc.
 cell_km      <- 10                # grid resolution (km): try 25/50/100
-crs_moll     <- "ESRI:54009"      # Mollweide (equal-area)
+crs_moll     <- "+proj=moll +lon_0=0 +datum=WGS84 +units=m +no_defs"      # Mollweide (equal-area)
 
 ## Data → points (WGS84 → Mollweide)# -----------------------------
 
