@@ -103,7 +103,7 @@ df_bin <- as.data.frame(r_q50_bin, xy = TRUE, na.rm = TRUE) %>%
 # MAKE NAs 0 also #
 
 ### this is only for visualisation dataset hasn't changed
-df_bin_NAsconverted0 <- df_bin %>% select(c(x, y, q50_bin)) %>% filter(q50_bin == 1)
+df_bin_NAsconverted0 <- df_bin %>% dplyr::select(c(x, y, q50_bin)) %>% filter(q50_bin == 1)
 
 conflict_binary_single <- ggplot() +
   geom_tile(data = df_bin_NAsconverted0, aes(x = x, y = y, fill = q50_bin)) +
