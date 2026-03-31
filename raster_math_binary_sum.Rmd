@@ -175,12 +175,7 @@ names(binary_sum) <- "sum_binary"
 binary_sum_df <- as.data.frame(binary_sum, xy = TRUE, na.rm = FALSE)
 binary_sum_df <- binary_sum_df %>%
   mutate(
-    sum_binary_cat = case_when(
-      is.na(sum_binary) ~ NA_real_,
-      sum_binary >= 3 ~ 3,
-      TRUE ~ sum_binary
-    ),
-    sum_binary_cat = factor(sum_binary_cat, levels = c(0, 1, 2, 3))
+    sum_binary_cat = factor(sum_binary, levels = c(0, 1, 2, 3, 4))
   )
 ```
 
@@ -209,18 +204,19 @@ binary_sum_plot <- ggplot() +
   scale_fill_manual(
     values = c(
       "0" = "#f7f7f7",
-      "1" = "#fdd49e",
-      "2" = "#fc8d59",
-      "3" = "#b30000"
+      "1" = "#fee8c8",
+      "2" = "#fdbb84",
+      "3" = "#e34a33",
+      "4" = "#7f0000"
     ),
     na.value = "white",
     name = "Count of\nbinary layers",
-    labels = c("0", "1", "2", "3")
+    labels = c("0", "1", "2", "3", "4")
   ) +
   labs(
     title = "Summed Binary Raster Pressure Surface",
     subtitle = "Deforestation, conflict, climate change, and pesticide use aligned in Mollweide projection",
-    caption = "All binary rasters were aligned to a common Mollweide template using the coarsest input resolution before summation. Legend values are discrete counts; the top class (3) groups cells with three or more layers present.",
+    caption = "All binary rasters were aligned to a common Mollweide template using the coarsest input resolution before summation. Final cell values show the discrete count of binary layers present, from 0 to 4.",
     x = NULL,
     y = NULL
   ) +
