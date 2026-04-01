@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Threshold Maps for Infectious Disease Risk</title>
+  <style>
+    body {
+      font-family: Georgia, "Times New Roman", serif;
+      margin: 0;
+      padding: 2rem;
+      background: #f6f4ef;
+      color: #1f1f1f;
+      line-height: 1.5;
+    }
+    main {
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+    h1 {
+      font-size: 2rem;
+      margin-bottom: 0.5rem;
+    }
+    p.lead {
+      font-size: 1.05rem;
+      max-width: 850px;
+      margin-bottom: 2rem;
+    }
+    section {
+      margin-bottom: 3rem;
+      padding-bottom: 2rem;
+      border-bottom: 1px solid #d8d2c4;
+    }
+    h2 {
+      margin-bottom: 0.35rem;
+    }
+    img {
+      width: 100%;
+      height: auto;
+      display: block;
+      border: 1px solid #d8d2c4;
+      background: #fff;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Threshold Maps for Infectious Disease Risk</h1>
+    <p class="lead">
+      This HTML file exports the upper-tail threshold maps derived from the Figure 3B infectious-disease workflow.
+      The maps show the highest 5%, 10%, and 25% of the risk distribution.
+    </p>
+
+    <section>
+      <h2>Top 5%</h2>
+      <p>Cells retained from the highest 5% of the histogram distribution.</p>
+      <img src="threshold_top_5.png" alt="Top 5 percent threshold map">
+    </section>
+
+    <section>
+      <h2>Top 10%</h2>
+      <p>Cells retained from the highest 10% of the histogram distribution.</p>
+      <img src="threshold_top_10.png" alt="Top 10 percent threshold map">
+    </section>
+
+    <section>
+      <h2>Top 25%</h2>
+      <p>Cells retained from the highest 25% of the histogram distribution.</p>
+      <img src="threshold_top_25.png" alt="Top 25 percent threshold map">
+    </section>
+  </main>
+</body>
+</html>

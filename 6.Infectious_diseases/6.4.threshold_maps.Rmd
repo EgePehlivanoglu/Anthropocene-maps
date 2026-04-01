@@ -1,0 +1,41 @@
+---
+title: "Threshold Maps for Infectious Disease Risk"
+output:
+  html_document:
+    toc: true
+    theme: cosmo
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+setwd("/Users/egepehlivanoglu/Library/CloudStorage/OneDrive-StockholmUniversity/KVA backup/KVAOneDrive_backup_28Jan2026/2. Projects/4.Cascades/Editorial Review 20250807/map/Anthropocene-maps/6.Infectious_diseases")
+source("6.3.histograms.R")
+```
+
+# Overview
+
+This report shows maps for the upper tail of the infectious disease risk distribution derived from the Figure 3B workflow.
+
+The maps below retain only the highest values from the histogram distribution:
+
+- top 5%
+- top 10%
+- top 25%
+
+# Top 5%
+
+```{r top5}
+threshold_map_plot(5)
+```
+
+# Top 10%
+
+```{r top10}
+threshold_map_plot(10)
+```
+
+# Top 25%
+
+```{r top25}
+threshold_map_plot(25)
+```

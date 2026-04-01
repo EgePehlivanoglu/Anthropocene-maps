@@ -38,6 +38,11 @@ template_raster <- function(df) {
 }
 
 # ---- 3) clip values to +/- 2.5 SD, as in the figure caption ----
+eid_mean <- mean(predictions$bsm_weight_pop, na.rm = TRUE)
+eid_sd <- sd(predictions$bsm_weight_pop, na.rm = TRUE)
+eid_lower <- eid_mean - 2.5 * eid_sd
+eid_upper <- eid_mean + 2.5 * eid_sd
+
 predictions$bsm_weight_pop_clipped <- clip_at_sd(predictions$bsm_weight_pop, 2.5)
 
 # ---- 4) build the raster the way the authors' scripts do ----
@@ -81,7 +86,7 @@ fig_3b_plot <- ggplot() +
     data = world_df,
     inherit.aes = FALSE,
     color = "white",
-    linewidth = 0.15
+    linewidth = 0.1
   ) +
   coord_fixed(xlim = c(-180, 180), ylim = c(-65, 90), expand = FALSE) +
   scale_fill_gradientn(
@@ -106,5 +111,53 @@ fig_3b_plot <- ggplot() +
 
 fig_3b_plot
 
-# ---- 6) optional save ----
+# ---- 6) alternative plot with explicit SD-scaled palette ----
+fig_3b_sd_plot <- ggplot() +
+  geom_polygon(
+    aes(x = long, y = lat, group = group),
+    data = world_df,
+    inherit.aes = FALSE,
+    fill = viridis::viridis(1)
+  ) +
+  geom_raster(
+    aes(x = x, y = y, fill = risk),
+    data = fig3b_df
+  ) +
+  geom_path(
+    aes(x = long, y = lat, group = group),
+    data = world_df,
+    inherit.aes = FALSE,
+    color = "white",
+    linewidth = 0.15
+  ) +
+  coord_fixed(xlim = c(-180, 180), ylim = c(-65, 90), expand = FALSE) +
+  scale_fill_gradientn(
+    colours = viridis::viridis(256),
+    limits = c(eid_lower, eid_upper),
+    oob = scales::squish,
+    guide = guide_colorbar(
+      label = TRUE,
+      label.position = "right",
+      title = "EID Risk Index\n(+/- 2.5 SD)"
+    )
+  ) +
+  theme(
+    panel.background = element_rect(fill = "black"),
+    plot.background = element_rect(fill = "black"),
+    line = element_blank(),
+    legend.title = element_text(color = "white", size = 8),
+    legend.text = element_text(color = "white", size = 8),
+    legend.title.align = 0,
+    legend.background = element_blank(),
+    legend.position = c(0.11, 0.45)
+  ) +
+  labs(
+    title = "Figure 3B reproduction with explicit SD scaling",
+    subtitle = "Colour palette limited to 2.5 SD above and below the mean",
+    x = NULL, y = NULL
+  )
+
+fig_3b_sd_plot
+
+# ---- 7) optional save ----
 # ggsave("fig_3b_infectious_diseases.png", fig_3b_plot, width = 11, height = 6.5, dpi = 300)
