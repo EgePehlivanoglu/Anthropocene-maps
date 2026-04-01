@@ -198,7 +198,7 @@ binary_sum_plot <- ggplot() +
     data = world_moll,
     fill = NA,
     color = "black",
-    linewidth = 0.1
+    linewidth = 0.05
   ) +
   coord_sf(crs = st_crs(target_crs), expand = FALSE) +
   scale_fill_manual(
@@ -213,6 +213,7 @@ binary_sum_plot <- ggplot() +
     name = "Count of\nbinary layers",
     labels = c("0", "1", "2", "3", "4")
   ) +
+  theme_minimal(base_size = 11) +
   labs(
     title = "Summed Binary Raster Pressure Surface",
     subtitle = "Deforestation, conflict, climate change, and pesticide use aligned in Mollweide projection",
@@ -228,6 +229,8 @@ binary_sum_plot <- ggplot() +
   )
 
 binary_sum_plot
+#Save plot
+# ggsave("summed_binary_raster_plot.png", binary_sum_plot, width = 8, height = 5, dpi = 300)
 ```
 
 # 7. Final output objects
