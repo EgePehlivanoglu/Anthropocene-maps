@@ -1,7 +1,7 @@
 # HISTOGRAMS AND THRESHOLD MAPS
 ## for fig 3B reproduction
-
-#source("6.2.Infectious_diseases.R")
+setwd(dir = "/Users/egepehlivanoglu/Library/CloudStorage/OneDrive-StockholmUniversity/KVA backup/KVAOneDrive_backup_28Jan2026/2. Projects/4.Cascades/Editorial Review 20250807/map/Anthropocene-maps/6.Infectious_diseases")
+source("6.2.Infectious_diseases.R")
 
 if (!requireNamespace("shiny", quietly = TRUE)) {
   install.packages("shiny", repos = "https://cloud.r-project.org")
@@ -25,13 +25,37 @@ abline(v = cutoff_5, col = "#b30000", lwd = 2, lty = 1)
 abline(v = cutoff_10, col = "#e34a33", lwd = 2, lty = 2)
 abline(v = cutoff_25, col = "#fdbb84", lwd = 2, lty = 3)
 
-legend(
-  "topright",
+legend(c("bottomright"),
   legend = c("Top 5%", "Top 10%", "Top 25%"),
   col = c("#b30000", "#e34a33", "#fdbb84"),
   lty = c(1, 2, 3),
   lwd = 2,
   bty = "n"
+)
+
+# Exclude 0s and NAs for better visualization
+his_df <- fig3b_df %>%
+  dplyr::filter(!is.na(risk) & risk > 0)
+
+hist(
+  his_df$risk,
+  xlab = "EID Risk Index",
+  main = "Histogram of EID Risk Index",
+  subtitle = "(excluding 0s and NAs)",
+  col = "steelblue",
+  border = "white"
+)
+
+abline(v = cutoff_5, col = "#b30000", lwd = 2, lty = 1)
+abline(v = cutoff_10, col = "#e34a33", lwd = 2, lty = 2)
+abline(v = cutoff_25, col = "#fdbb84", lwd = 2, lty = 3)
+
+legend(c("bottomright"),
+       legend = c("Top 5%", "Top 10%", "Top 25%"),
+       col = c("#b30000", "#e34a33", "#fdbb84"),
+       lty = c(1, 2, 3),
+       lwd = 2,
+       bty = "n"
 )
 
 # ---- 2) helper for upper-tail thresholds ----
