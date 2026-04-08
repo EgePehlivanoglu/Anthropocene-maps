@@ -9,56 +9,115 @@ if (!requireNamespace("librarian", quietly = TRUE)) {
 }
 
 library(librarian)
-shelf(terra, sf, ggplot2, dplyr, rnaturalearth, patchwork, viridis)
+shelf(terra, sf, ggplot2, dplyr, rnaturalearth, viridis, knitr)
 
 # ---- 1) source the summed binary raster workflow ----
-source_raster_objects <- function(script_path, keep_names) {
-  env <- new.env(parent = globalenv())
-  sys.source(script_path, envir = env)
-  rm(list = setdiff(ls(envir = env), keep_names), envir = env)
-  env
+load_summed_binary_context <- function() {
+  required_names <- c("binary_sum", "target_crs", "target_res")
+  context_rds <- "summed_binary_context.rds"
+
+  if (file.exists(context_rds)) {
+    sum_context <- readRDS(context_rds)
+    sum_env <- new.env(parent = globalenv())
+    list2env(sum_context, envir = sum_env)
+    return(sum_env)
+  }
+
+  if (all(vapply(required_names, exists, logical(1), envir = .GlobalEnv, inherits = FALSE))) {
+    return(.GlobalEnv)
+  }
+
+  sum_env <- new.env(parent = globalenv())
+  sum_r_script <- tempfile(fileext = ".R")
+  knitr::purl(
+    input = "raster_math_binary_sum.Rmd",
+    output = sum_r_script,
+    quiet = TRUE
+  )
+
+  tryCatch(
+    sys.source(sum_r_script, envir = sum_env),
+    error = function(e) {
+      stop(
+        paste(
+          "Could not load summed binary raster context automatically.",
+          "Prefer running raster_math_binary_sum.Rmd first to create summed_binary_context.rds.",
+          "If the fallback notebook sourcing is used, its data sources must be reachable.",
+          "Original error:", conditionMessage(e)
+        ),
+        call. = FALSE
+      )
+    }
+  )
+
+  missing_required <- required_names[!vapply(required_names, exists, logical(1), envir = sum_env, inherits = FALSE)]
+  if (length(missing_required) > 0) {
+    stop(
+      paste(
+        "The sourced raster_math_binary_sum.Rmd did not create required objects:",
+        paste(missing_required, collapse = ", ")
+      ),
+      call. = FALSE
+    )
+  }
+
+  sum_env
 }
 
-binary_to_zero <- function(r) {
-  terra::ifel(is.na(r), 0, r)
+valid_spatraster <- function(x) {
+  inherits(x, "SpatRaster") &&
+    !inherits(try(terra::nlyr(x), silent = TRUE), "try-error")
 }
 
-deforestation_env <- source_raster_objects(
-  "1.Deforestation/1.4.Deforestation_bin.R",
-  c("deforestation_bin_SR")
-)
-conflict_env <- source_raster_objects(
-  "2.Conflict/2.5.Conflict_bin.R",
-  c("conflict_bin_SR")
-)
-climate_env <- source_raster_objects(
-  "4.Climate_change/4.4.Climate_change_bin_SR.R",
-  c("clim_change_binSR")
-)
-pesticide_env <- source_raster_objects(
-  "5.Pesticide_use/5.3.Pesticide_RiskScores_SRbin.R",
-  c("pesticide_SR_bin")
-)
+rebuild_extent_from_df <- function(df, res_xy) {
+  terra::ext(
+    min(df$x, na.rm = TRUE) - res_xy[1] / 2,
+    max(df$x, na.rm = TRUE) + res_xy[1] / 2,
+    min(df$y, na.rm = TRUE) - res_xy[2] / 2,
+    max(df$y, na.rm = TRUE) + res_xy[2] / 2
+  )
+}
 
-r_list <- list(
-  deforestation = get("deforestation_bin_SR", envir = deforestation_env),
-  conflict = get("conflict_bin_SR", envir = conflict_env),
-  climate = get("clim_change_binSR", envir = climate_env),
-  pesticide = get("pesticide_SR_bin", envir = pesticide_env)
-)
+sum_env <- load_summed_binary_context()
 
-target_crs <- terra::crs(r_list$deforestation)
-target_res <- c(
-  max(vapply(r_list, function(r) terra::res(r)[1], numeric(1))),
-  max(vapply(r_list, function(r) terra::res(r)[2], numeric(1)))
-)
+binary_sum <- if (exists("binary_sum", envir = sum_env, inherits = FALSE)) {
+  get("binary_sum", envir = sum_env)
+} else {
+  NULL
+}
+target_crs <- if (exists("target_crs", envir = sum_env, inherits = FALSE)) {
+  get("target_crs", envir = sum_env)
+} else {
+  terra::crs(binary_sum)
+}
+target_res <- if (exists("target_res", envir = sum_env, inherits = FALSE)) {
+  get("target_res", envir = sum_env)
+} else {
+  terra::res(binary_sum)
+}
 
-target_extent <- terra::ext(
-  min(vapply(r_list, function(r) terra::ext(r)[1], numeric(1))),
-  max(vapply(r_list, function(r) terra::ext(r)[2], numeric(1))),
-  min(vapply(r_list, function(r) terra::ext(r)[3], numeric(1))),
-  max(vapply(r_list, function(r) terra::ext(r)[4], numeric(1)))
-)
+if (exists("binary_sum_df", envir = sum_env, inherits = FALSE)) {
+  binary_sum_df <- get("binary_sum_df", envir = sum_env)
+} else {
+  binary_sum_df <- as.data.frame(binary_sum, xy = TRUE, na.rm = FALSE)
+}
+
+if (!valid_spatraster(binary_sum) && exists("binary_sum_df", inherits = FALSE)) {
+  binary_sum <- terra::rast(
+    stats::na.omit(binary_sum_df[, c("x", "y", "sum_binary")]),
+    type = "xyz",
+    crs = target_crs
+  )
+  names(binary_sum) <- "sum_binary"
+}
+
+target_extent <- if (exists("target_extent", envir = sum_env, inherits = FALSE)) {
+  do.call(terra::ext, as.list(get("target_extent", envir = sum_env)))
+} else if (valid_spatraster(binary_sum)) {
+  terra::ext(binary_sum)
+} else {
+  rebuild_extent_from_df(binary_sum_df, target_res)
+}
 
 common_template_raster <- terra::rast(
   ext = target_extent,
@@ -66,14 +125,16 @@ common_template_raster <- terra::rast(
   crs = target_crs
 )
 
-r_aligned <- lapply(r_list, function(r) {
-  terra::resample(r, common_template_raster, method = "near")
-})
-r_aligned_zero <- lapply(r_aligned, binary_to_zero)
+if (exists("world_moll", envir = sum_env, inherits = FALSE)) {
+  world_moll <- get("world_moll", envir = sum_env)
+} else {
+  world_moll <- sf::st_transform(
+    rnaturalearth::ne_countries(scale = "medium", returnclass = "sf"),
+    crs = target_crs
+  )
+}
 
-binary_sum <- Reduce(`+`, r_aligned_zero)
-names(binary_sum) <- "sum_binary"
-binary_sum_df <- as.data.frame(binary_sum, xy = TRUE, na.rm = FALSE) %>%
+binary_sum_df <- binary_sum_df %>%
   mutate(sum_binary_cat = factor(sum_binary, levels = c(0, 1, 2, 3, 4)))
 
 # ---- 2) source the infectious disease threshold workflow ----
@@ -101,14 +162,7 @@ top25_presence_df <- as.data.frame(top25_presence, xy = TRUE, na.rm = TRUE)
 top25_presence_zero <- terra::ifel(is.na(top25_presence), 0, top25_presence)
 names(top25_presence_zero) <- "presence"
 
-# ---- 3) shared basemap ----
-setwd("/Users/egepehlivanoglu/Library/CloudStorage/OneDrive-StockholmUniversity/KVA backup/KVAOneDrive_backup_28Jan2026/2. Projects/4.Cascades/Editorial Review 20250807/map/Anthropocene-maps")
-world_moll <- sf::st_transform(
-  rnaturalearth::ne_countries(scale = "medium", returnclass = "sf"),
-  crs = target_crs
-)
-
-# ---- 4) publication-style side-by-side figure ----
+# ---- 3) publication-style side-by-side figure ----
 sum_map_plot <- ggplot() +
   geom_tile(
     data = binary_sum_df,
@@ -172,7 +226,7 @@ comparison_side_by_side <- sum_map_plot + infectious_map_plot +
     subtitle = "Both layers shown in Mollweide projection with matched extent"
   )
 
-# ---- 5) publication-style single-map overlay ----
+# ---- 4) publication-style single-map overlay ----
 overlay_plot <- ggplot() +
   geom_tile(
     data = binary_sum_df,
@@ -212,34 +266,71 @@ overlay_plot <- ggplot() +
     plot.title = element_text(face = "bold")
   )
 
-# ---- 6) bivariate comparison map ----
-bivariate_stack <- c(binary_sum, top25_presence_zero)
-names(bivariate_stack) <- c("sum_binary", "presence")
+# ---- 5) bivariate comparison map ----
+eid_breaks <- stats::quantile(
+  top25_fig3b_df$risk,
+  probs = c(1 / 3, 2 / 3),
+  na.rm = TRUE
+)
+
+bivariate_sum <- terra::resample(binary_sum, common_template_raster, method = "near")
+names(bivariate_sum) <- "sum_binary"
+bivariate_stack <- c(bivariate_sum, top25_raster)
+names(bivariate_stack) <- c("sum_binary", "risk")
+
 bivariate_df <- as.data.frame(bivariate_stack, xy = TRUE, na.rm = FALSE) %>%
   mutate(
-    sum_class = if_else(sum_binary >= 2, "High summed pressure", "Low summed pressure"),
-    inf_class = if_else(presence >= 1, "Top 25% infectious risk", "Lower infectious risk"),
+    sum_class = dplyr::case_when(
+      sum_binary == 1 ~ 1L,
+      sum_binary == 2 ~ 2L,
+      sum_binary == 3 ~ 3L,
+      TRUE ~ NA_integer_
+    ),
+    inf_class = dplyr::case_when(
+      is.na(risk) ~ NA_integer_,
+      risk <= eid_breaks[[1]] ~ 1L,
+      risk <= eid_breaks[[2]] ~ 2L,
+      risk > eid_breaks[[2]] ~ 3L,
+      TRUE ~ NA_integer_
+    ),
     bivar_class = dplyr::case_when(
-      sum_class == "Low summed pressure" & inf_class == "Lower infectious risk" ~ "1",
-      sum_class == "High summed pressure" & inf_class == "Lower infectious risk" ~ "2",
-      sum_class == "Low summed pressure" & inf_class == "Top 25% infectious risk" ~ "3",
-      sum_class == "High summed pressure" & inf_class == "Top 25% infectious risk" ~ "4",
+      sum_class == 1L & inf_class == 1L ~ "1-1",
+      sum_class == 2L & inf_class == 1L ~ "2-1",
+      sum_class == 3L & inf_class == 1L ~ "3-1",
+      sum_class == 1L & inf_class == 2L ~ "1-2",
+      sum_class == 2L & inf_class == 2L ~ "2-2",
+      sum_class == 3L & inf_class == 2L ~ "3-2",
+      sum_class == 1L & inf_class == 3L ~ "1-3",
+      sum_class == 2L & inf_class == 3L ~ "2-3",
+      sum_class == 3L & inf_class == 3L ~ "3-3",
       TRUE ~ NA_character_
     ),
-    bivar_class = factor(bivar_class, levels = c("1", "2", "3", "4"))
-  )
+    bivar_class = factor(
+      bivar_class,
+      levels = c("1-1", "2-1", "3-1", "1-2", "2-2", "3-2", "1-3", "2-3", "3-3")
+    )
+  ) %>%
+  dplyr::filter(!is.na(bivar_class))
 
 bivariate_palette <- c(
-  "1" = "#e8e8e8",
-  "2" = "#73ae80",
-  "3" = "#be64ac",
-  "4" = "#2a5a5b"
+  "1-1" = "#e8e8e8",
+  "2-1" = "#ace4e4",
+  "3-1" = "#5ac8c8",
+  "1-2" = "#dfb0d6",
+  "2-2" = "#a5add3",
+  "3-2" = "#5698b9",
+  "1-3" = "#be64ac",
+  "2-3" = "#8c62aa",
+  "3-3" = "#3b4994"
 )
 
 bivariate_legend_df <- data.frame(
-  x = c(1, 2, 1, 2),
-  y = c(1, 1, 2, 2),
-  bivar_class = factor(c("1", "2", "3", "4"), levels = c("1", "2", "3", "4"))
+  x = rep(1:3, times = 3),
+  y = rep(1:3, each = 3),
+  bivar_class = factor(
+    c("1-1", "2-1", "3-1", "1-2", "2-2", "3-2", "1-3", "2-3", "3-3"),
+    levels = c("1-1", "2-1", "3-1", "1-2", "2-2", "3-2", "1-3", "2-3", "3-3")
+  )
 )
 
 bivariate_map <- ggplot() +
@@ -256,8 +347,8 @@ bivariate_map <- ggplot() +
   ) +
   labs(
     title = "C. Bivariate comparison of cumulative pressure and infectious disease hotspots",
-    subtitle = "2x2 broad classes following bivariate mapping guidance",
-    caption = "Summed binary pressure is grouped into low (0-1) and high (2-4). Infectious disease risk is grouped as outside versus inside the top 25% of the distribution.",
+    subtitle = "3x3 classes using summed pressure and terciles within the top 25% infectious subset",
+    caption = "Summed binary pressure is grouped as 1, 2, and 3 layers. Infectious disease risk is split into terciles within the top 25% subset; cells outside those classes are left blank.",
     x = NULL, y = NULL
   ) +
   theme_minimal(base_size = 11) +
@@ -280,10 +371,12 @@ bivariate_legend_plot <- ggplot(
     x = "Summed binary pressure",
     y = "Infectious disease risk"
   ) +
-  annotate("text", x = 1, y = 0.55, label = "Low", size = 3) +
-  annotate("text", x = 2, y = 0.55, label = "High", size = 3) +
-  annotate("text", x = 0.55, y = 1, label = "Low", angle = 90, size = 3) +
-  annotate("text", x = 0.55, y = 2, label = "High", angle = 90, size = 3) +
+  annotate("text", x = 1, y = 0.45, label = "1", size = 3) +
+  annotate("text", x = 2, y = 0.45, label = "2", size = 3) +
+  annotate("text", x = 3, y = 0.45, label = "3", size = 3) +
+  annotate("text", x = 0.45, y = 1, label = "Low", angle = 90, size = 3) +
+  annotate("text", x = 0.45, y = 2, label = "Mid", angle = 90, size = 3) +
+  annotate("text", x = 0.45, y = 3, label = "High", angle = 90, size = 3) +
   theme_void(base_size = 10) +
   theme(
     plot.margin = margin(20, 20, 20, 5),
@@ -291,14 +384,33 @@ bivariate_legend_plot <- ggplot(
     axis.title.y = element_text(size = 9, angle = 90, margin = margin(r = 10))
   )
 
-bivariate_plot <- bivariate_map + bivariate_legend_plot +
-  patchwork::plot_layout(widths = c(5, 1.3))
+bivariate_plot <- function() {
+  grid::grid.newpage()
+  grid::pushViewport(
+    grid::viewport(layout = grid::grid.layout(nrow = 1, ncol = 2,
+      widths = grid::unit(c(5, 1.5), "null")
+    ))
+  )
+  print(bivariate_map, vp = grid::viewport(layout.pos.row = 1, layout.pos.col = 1))
+  print(bivariate_legend_plot, vp = grid::viewport(layout.pos.row = 1, layout.pos.col = 2))
+}
 
-comparison_side_by_side
+print_side_by_side <- function() {
+  grid::grid.newpage()
+  grid::pushViewport(grid::viewport(layout = grid::grid.layout(nrow = 1, ncol = 2)))
+  print(sum_map_plot, vp = grid::viewport(layout.pos.row = 1, layout.pos.col = 1))
+  print(infectious_map_plot, vp = grid::viewport(layout.pos.row = 1, layout.pos.col = 2))
+}
+
+comparison_side_by_side <- print_side_by_side
+
+comparison_side_by_side()
 overlay_plot
-bivariate_plot
+bivariate_plot()
 
 # Optional exports
-# ggsave("6.5.side_by_side_comparison.png", comparison_side_by_side, width = 14, height = 6.5, dpi = 300)
-# ggsave("6.5.overlay_comparison.png", overlay_plot, width = 8, height = 6.5, dpi = 300)
-# ggsave("6.5.bivariate_comparison.png", bivariate_plot, width = 8, height = 6.5, dpi = 300)
+# pdf("6.5.comparison_maps.pdf", width = 16, height = 6.5)
+# comparison_side_by_side()
+# overlay_plot
+# bivariate_plot()
+# dev.off()

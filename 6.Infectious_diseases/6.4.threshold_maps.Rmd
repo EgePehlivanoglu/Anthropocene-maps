@@ -3,7 +3,6 @@ title: "Threshold Maps for Infectious Disease Risk"
 output:
   html_document:
     toc: true
-    theme: cosmo
 ---
 
 ```{r setup, include=FALSE}
@@ -41,4 +40,22 @@ threshold_map_plot(10)
 
 ```{r top25}
 threshold_map_plot(25)
+```
+```{r save}
+pdf("threshold_maps.pdf", width = 10, height = 6)
+
+plot.new()
+text(0.05, 0.92, "Threshold Maps for Infectious Disease Risk", adj = c(0, 1), cex = 1.4, font = 2)
+text(0.05, 0.80, "Notes and assumptions", adj = c(0, 1), cex = 1.1, font = 2)
+text(0.05, 0.72, "1. All 0s and NAs are excluded before calculating top-percent thresholds.", adj = c(0, 1), cex = 1)
+text(0.05, 0.64, "2. The plotted maps also exclude all 0 and NA cells.", adj = c(0, 1), cex = 1)
+text(0.05, 0.56, "3. First plot = Top 5% of the filtered distribution.", adj = c(0, 1), cex = 1)
+text(0.05, 0.48, "4. Second plot = Top 10% of the filtered distribution.", adj = c(0, 1), cex = 1)
+text(0.05, 0.40, "5. Third plot = Top 25% of the filtered distribution.", adj = c(0, 1), cex = 1)
+text(0.05, 0.28, "All thresholds are based on the Figure 3B infectious disease risk workflow.", adj = c(0, 1), cex = 1)
+
+threshold_map_plot(5)
+threshold_map_plot(10)
+threshold_map_plot(25)
+dev.off()
 ```

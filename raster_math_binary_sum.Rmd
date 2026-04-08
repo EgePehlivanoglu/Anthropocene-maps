@@ -241,3 +241,22 @@ These are the key outputs from the workflow: the summed raster and the chosen ta
 binary_sum
 target_res
 ```
+
+# 8. Save reusable context for downstream scripts
+
+This saves the summed-raster objects into a single `.rds` file so downstream comparison scripts can load a stable precomputed context instead of rerunning the full workflow.
+
+```{r save-context}
+sum_context <- list(
+  binary_sum_packed = terra::wrap(binary_sum),
+  binary_sum_df = binary_sum_df,
+  target_crs = target_crs,
+  target_res = target_res,
+  target_extent = as.vector(terra::ext(template_raster)),
+  template_raster_packed = terra::wrap(template_raster),
+  world_moll = world_moll,
+  binary_sum_plot = binary_sum_plot
+)
+
+saveRDS(sum_context, file = "summed_binary_context.rds")
+```
