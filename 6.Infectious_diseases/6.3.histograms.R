@@ -9,39 +9,19 @@ if (!requireNamespace("shiny", quietly = TRUE)) {
 library(shiny)
 
 # ---- 1) histogram of the Fig. 3B raster values ----
-cutoff_5 <- stats::quantile(fig3b_df$risk, probs = 0.95, na.rm = TRUE)
-cutoff_10 <- stats::quantile(fig3b_df$risk, probs = 0.90, na.rm = TRUE)
-cutoff_25 <- stats::quantile(fig3b_df$risk, probs = 0.75, na.rm = TRUE)
-
-hist(
-  fig3b_df$risk,
-  xlab = "EID Risk Index",
-  main = "Histogram of EID Risk Index",
-  col = "steelblue",
-  border = "white"
-)
-
-abline(v = cutoff_5, col = "#b30000", lwd = 2, lty = 1)
-abline(v = cutoff_10, col = "#e34a33", lwd = 2, lty = 2)
-abline(v = cutoff_25, col = "#fdbb84", lwd = 2, lty = 3)
-
-legend(c("bottomright"),
-  legend = c("Top 5%", "Top 10%", "Top 25%"),
-  col = c("#b30000", "#e34a33", "#fdbb84"),
-  lty = c(1, 2, 3),
-  lwd = 2,
-  bty = "n"
-)
-
-# Exclude 0s and NAs for better visualization
-his_df <- fig3b_df %>%
+# Exclude 0s and NAs before calculating upper-tail thresholds
+hist_df <- fig3b_df %>%
   dplyr::filter(!is.na(risk) & risk > 0)
 
+cutoff_5 <- stats::quantile(hist_df$risk, probs = 0.95, na.rm = TRUE)
+cutoff_10 <- stats::quantile(hist_df$risk, probs = 0.90, na.rm = TRUE)
+cutoff_25 <- stats::quantile(hist_df$risk, probs = 0.75, na.rm = TRUE)
+
 hist(
-  his_df$risk,
+  hist_df$risk,
   xlab = "EID Risk Index",
   main = "Histogram of EID Risk Index",
-  subtitle = "(excluding 0s and NAs)",
+  sub = "Thresholds calculated after excluding 0s and NAs",
   col = "steelblue",
   border = "white"
 )
@@ -60,8 +40,11 @@ legend(c("bottomright"),
 
 # ---- 2) helper for upper-tail thresholds ----
 top_threshold_data <- function(df, percent = 10) {
-  cutoff <- stats::quantile(df$risk, probs = 1 - percent / 100, na.rm = TRUE)
-  filtered <- df %>%
+  filtered_input <- df %>%
+    dplyr::filter(!is.na(risk) & risk > 0)
+
+  cutoff <- stats::quantile(filtered_input$risk, probs = 1 - percent / 100, na.rm = TRUE)
+  filtered <- filtered_input %>%
     dplyr::filter(risk >= cutoff)
 
   list(
@@ -71,7 +54,7 @@ top_threshold_data <- function(df, percent = 10) {
 }
 
 # ---- 3) top 10% data from the histogram distribution ----
-top10_result <- top_threshold_data(fig3b_df, percent = 10)
+top10_result <- top_threshold_data(hist_df, percent = 10)
 top10_fig3b_df <- top10_result$data
 top10_cutoff <- top10_result$cutoff
 
@@ -115,7 +98,12 @@ top10_fig3b_plot <- ggplot() +
   ) +
   labs(
     title = "Top 10% of EID Risk Index",
-    subtitle = paste0("Cells with values at or above the ", round(top10_cutoff, 6), " cutoff"),
+    subtitle = paste0(
+      "Cells at or above ",
+      round(top10_cutoff, 6),
+      " after excluding 0s and NAs"
+    ),
+    caption = "Threshold calculated from non-zero, non-missing cells only.",
     x = NULL,
     y = NULL
   )
@@ -124,7 +112,7 @@ top10_fig3b_plot
 
 # ---- 5) interactive threshold map ----
 threshold_map_plot <- function(percent = 10) {
-  threshold_result <- top_threshold_data(fig3b_df, percent = percent)
+  threshold_result <- top_threshold_data(hist_df, percent = percent)
   threshold_df <- threshold_result$data
   threshold_cutoff <- threshold_result$cutoff
 
@@ -167,7 +155,12 @@ threshold_map_plot <- function(percent = 10) {
     ) +
     labs(
       title = paste0("Top ", percent, "% of EID Risk Index"),
-      subtitle = paste0("Cutoff value: ", round(threshold_cutoff, 6)),
+      subtitle = paste0(
+        "Cutoff value: ",
+        round(threshold_cutoff, 6),
+        " after excluding 0s and NAs"
+      ),
+      caption = "Interactive threshold map based on non-zero, non-missing cells only.",
       x = NULL,
       y = NULL
     )
@@ -176,6 +169,7 @@ threshold_map_plot <- function(percent = 10) {
 threshold_app <- shinyApp(
   ui = fluidPage(
     titlePanel("Interactive threshold map for infectious disease risk"),
+    p("Thresholds are calculated after excluding 0s and NAs from the risk distribution."),
     sidebarLayout(
       sidebarPanel(
         sliderInput(

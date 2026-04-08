@@ -22,6 +22,9 @@ The maps below retain only the highest values from the histogram distribution:
 - top 10%
 - top 25%
 
+Assumptions:
++ All 0s and NAs are excluded to calculate the top percentages and excluded from the maps. 
+
 # Top 5%
 
 ```{r top5}
