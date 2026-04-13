@@ -144,23 +144,23 @@ source("6.2.Infectious_diseases.R")
 hist_df <- fig3b_df %>%
   dplyr::filter(!is.na(risk) & risk > 0)
 
-top25_cutoff <- stats::quantile(hist_df$risk, probs = 0.75, na.rm = TRUE)
-top25_fig3b_df <- hist_df %>%
-  dplyr::filter(risk >= top25_cutoff)
+top5_cutoff <- stats::quantile(hist_df$risk, probs = 0.95, na.rm = TRUE)
+top5_fig3b_df <- hist_df %>%
+  dplyr::filter(risk >= top5_cutoff)
 
 # Reproject infectious threshold map to Mollweide so both figures match
-top25_vect <- terra::vect(top25_fig3b_df, geom = c("x", "y"), crs = "EPSG:4326")
-top25_vect_moll <- terra::project(top25_vect, target_crs)
-top25_raster <- terra::rasterize(top25_vect_moll, common_template_raster, field = "risk", fun = "max")
-names(top25_raster) <- "risk"
-top25_df_moll <- as.data.frame(top25_raster, xy = TRUE, na.rm = TRUE)
+top5_vect <- terra::vect(top5_fig3b_df, geom = c("x", "y"), crs = "EPSG:4326")
+top5_vect_moll <- terra::project(top5_vect, target_crs)
+top5_raster <- terra::rasterize(top5_vect_moll, common_template_raster, field = "risk", fun = "max")
+names(top5_raster) <- "risk"
+top5_df_moll <- as.data.frame(top5_raster, xy = TRUE, na.rm = TRUE)
 
 # Binary presence layer for overlay
-top25_presence <- terra::ifel(is.na(top25_raster), NA, 1)
-names(top25_presence) <- "presence"
-top25_presence_df <- as.data.frame(top25_presence, xy = TRUE, na.rm = TRUE)
-top25_presence_zero <- terra::ifel(is.na(top25_presence), 0, top25_presence)
-names(top25_presence_zero) <- "presence"
+top5_presence <- terra::ifel(is.na(top5_raster), NA, 1)
+names(top5_presence) <- "presence"
+top5_presence_df <- as.data.frame(top5_presence, xy = TRUE, na.rm = TRUE)
+top5_presence_zero <- terra::ifel(is.na(top5_presence), 0, top5_presence)
+names(top5_presence_zero) <- "presence"
 
 # ---- 3) publication-style side-by-side figure ----
 sum_map_plot <- ggplot() +
@@ -197,18 +197,18 @@ sum_map_plot <- ggplot() +
 
 infectious_map_plot <- ggplot() +
   geom_tile(
-    data = top25_df_moll,
+    data = top5_df_moll,
     aes(x = x, y = y, fill = risk)
   ) +
   geom_sf(data = world_moll, fill = NA, color = "grey15", linewidth = 0.05) +
   coord_sf(crs = st_crs(target_crs), expand = FALSE) +
   scale_fill_gradientn(
     colours = c("#fff7bc", "#fec44f", "#fe9929", "#d95f0e", "#993404"),
-    name = "Top 25%\ninfectious risk"
+    name = "Top 5%\ninfectious risk"
   ) +
   labs(
-    title = "B. Infectious disease top 25%",
-    subtitle = "Upper quartile of EID risk index",
+    title = "B. Infectious disease top 5%",
+    subtitle = "Upper tail of EID risk index",
     x = NULL, y = NULL
   ) +
   theme_minimal(base_size = 11) +
@@ -233,7 +233,7 @@ overlay_plot <- ggplot() +
     aes(x = x, y = y, fill = sum_binary_cat)
   ) +
   geom_tile(
-    data = top25_presence_df,
+    data = top5_presence_df,
     aes(x = x, y = y),
     fill = "black",
     alpha = 0.28
@@ -253,7 +253,7 @@ overlay_plot <- ggplot() +
   ) +
   labs(
     title = "Overlay of summed binary pressures and infectious disease hotspots",
-    subtitle = "Black overlay marks cells in the top 25% of infectious disease risk",
+    subtitle = "Black overlay marks cells in the top 5% of infectious disease risk",
     caption = "Recommended for publication only when accompanied by the side-by-side comparison panel.",
     x = NULL, y = NULL
   ) +
@@ -268,14 +268,14 @@ overlay_plot <- ggplot() +
 
 # ---- 5) bivariate comparison map ----
 eid_breaks <- stats::quantile(
-  top25_fig3b_df$risk,
+  top5_fig3b_df$risk,
   probs = c(1 / 3, 2 / 3),
   na.rm = TRUE
 )
 
 bivariate_sum <- terra::resample(binary_sum, common_template_raster, method = "near")
 names(bivariate_sum) <- "sum_binary"
-bivariate_stack <- c(bivariate_sum, top25_raster)
+bivariate_stack <- c(bivariate_sum, top5_raster)
 names(bivariate_stack) <- c("sum_binary", "risk")
 
 bivariate_df <- as.data.frame(bivariate_stack, xy = TRUE, na.rm = FALSE) %>%
@@ -347,8 +347,8 @@ bivariate_map <- ggplot() +
   ) +
   labs(
     title = "C. Bivariate comparison of cumulative pressure and infectious disease hotspots",
-    subtitle = "3x3 classes using summed pressure and terciles within the top 25% infectious subset",
-    caption = "Summed binary pressure is grouped as 1, 2, and 3 layers. Infectious disease risk is split into terciles within the top 25% subset; cells outside those classes are left blank.",
+    subtitle = "3x3 classes using summed pressure and terciles within the top 5% infectious subset",
+    caption = "Summed binary pressure is grouped as 1, 2, and 3 layers. Infectious disease risk is split into terciles within the top 5% subset; cells outside those classes are left blank.",
     x = NULL, y = NULL
   ) +
   theme_minimal(base_size = 11) +
