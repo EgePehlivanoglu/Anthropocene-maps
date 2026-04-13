@@ -41,6 +41,7 @@ threshold_map_plot(10)
 ```{r top25}
 threshold_map_plot(25)
 ```
+
 ```{r save}
 pdf("threshold_maps.pdf", width = 10, height = 6)
 

@@ -1,0 +1,165 @@
+---
+title: "Reproducing Figure 3A from Allen et al. (2017)"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+
+if (!requireNamespace("librarian", quietly = TRUE)) {
+  install.packages("librarian", repos = "https://cloud.r-project.org")
+}
+
+library(librarian)
+shelf(raster, terra, sf, sp, rnaturalearth, tidyverse, viridis, maps)
+```
+
+# Overview
+
+This document reproduces Figure 3A from Allen et al. (2017), *Global hotspots and correlates of emerging zoonotic diseases*.
+
+Figure 3A is the predicted distribution of observed zoonotic EID event risk, using the weighted model output with current reporting effort.
+
+Source:
+[Allen et al. (2017), Nature Communications](https://www.nature.com/articles/s41467-017-00923-8)
+
+# 1. Load archived model predictions
+
+```{r load-predictions}
+predictions_path <- "~/Library/CloudStorage/OneDrive-StockholmUniversity/KVA backup/KVAOneDrive_backup_28Jan2026/2. Projects/4.Cascades/Editorial Review 20250807/map/Base maps/6.Infectious_diseases/Allen 2017/predictions.RData"
+
+stopifnot(file.exists(path.expand(predictions_path)))
+load(path.expand(predictions_path))  # loads object: predictions
+
+predictions <- predictions %>%
+  dplyr::select(gridid, lon, lat, bsm_weight_pubs) %>%
+  dplyr::filter(
+    is.finite(lon),
+    is.finite(lat),
+    is.finite(bsm_weight_pubs)
+  )
+```
+
+# 2. Helper functions
+
+```{r helpers}
+clip_at_sd <- function(x, multiple = 1) {
+  m <- mean(x, na.rm = TRUE)
+  s <- sd(x, na.rm = TRUE) * multiple
+  x %>%
+    pmin(m + s) %>%
+    pmax(m - s)
+}
+
+template_raster <- function(df) {
+  template_df <- df %>%
+    dplyr::select(lon, lat, gridid)
+  sp::coordinates(template_df) <- c("lon", "lat")
+  sp::gridded(template_df) <- TRUE
+  sp::proj4string(template_df) <- sp::CRS(
+    "+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"
+  )
+  raster::raster(template_df)
+}
+```
+
+# 3. Apply the figure scaling
+
+The paper states that Figure 3 maps were created using standard deviation scaling. Because the `bsm_weight_pubs` surface is strictly positive, this reproduction anchors the lower bound at `0` and uses `mean + 2.5 SD` as the upper color limit so the visual contrast better matches the published figure.
+
+```{r scale-values}
+eid_mean <- mean(predictions$bsm_weight_pubs, na.rm = TRUE)
+eid_sd <- sd(predictions$bsm_weight_pubs, na.rm = TRUE)
+eid_lower <- 0
+eid_upper <- eid_mean + 2.5 * eid_sd
+
+predictions$bsm_weight_pubs_clipped <- clip_at_sd(predictions$bsm_weight_pubs, 2.5)
+```
+
+# 4. Build the raster surface
+
+```{r build-raster}
+country_outlines <- terra::vect(
+  sf::st_transform(
+    rnaturalearth::ne_countries(scale = "medium", returnclass = "sf"),
+    crs = "EPSG:4326"
+  )
+)
+
+fig3a_raster <- predictions %>%
+  dplyr::select(x = lon, y = lat, z = bsm_weight_pubs_clipped) %>%
+  raster::rasterFromXYZ(crs = raster::crs(template_raster(predictions))) %>%
+  raster::disaggregate(2, method = "bilinear")
+
+fig3a_raster <- terra::rast(fig3a_raster)
+terra::crs(fig3a_raster) <- "EPSG:4326"
+fig3a_raster <- terra::mask(fig3a_raster, country_outlines)
+names(fig3a_raster) <- "risk"
+
+fig3a_df <- as.data.frame(fig3a_raster, xy = TRUE) %>%
+  stats::na.omit()
+
+world_df <- ggplot2::map_data("world")
+```
+
+# 5. Plot Figure 3A
+
+```{r plot-fig3a}
+fig_3a_plot <- ggplot() +
+  geom_polygon(
+    aes(x = long, y = lat, group = group),
+    data = world_df,
+    inherit.aes = FALSE,
+    fill = viridis::viridis(1)
+  ) +
+  geom_raster(
+    aes(x = x, y = y, fill = risk),
+    data = fig3a_df
+  ) +
+  geom_path(
+    aes(x = long, y = lat, group = group),
+    data = world_df,
+    inherit.aes = FALSE,
+    color = "white",
+    linewidth = 0.05
+  ) +
+  coord_fixed(xlim = c(-180, 180), ylim = c(-65, 90), expand = FALSE) +
+  scale_fill_gradientn(
+    colours = viridis::viridis(256),
+    limits = c(eid_lower, eid_upper),
+    oob = scales::squish,
+    guide = guide_colorbar(
+      label = TRUE,
+      label.position = "right",
+      title = "Observed EID risk index\n(0 to +2.5 SD)"
+    )
+  ) +
+  theme(
+    panel.background = element_rect(fill = "black"),
+    plot.background = element_rect(fill = "black"),
+    line = element_blank(),
+    legend.title = element_text(color = "white", size = 8),
+    legend.text = element_text(color = "white", size = 8),
+    legend.title.align = 0,
+    legend.background = element_blank(),
+    legend.position = c(0.11, 0.45)
+  ) +
+  labs(
+    title = "Figure 3A reproduction",
+    subtitle = "Weighted model output with current reporting effort",
+    x = NULL,
+    y = NULL
+  )
+
+fig_3a_plot
+```
+
+# 6. Notes
+
+- Variable used: `bsm_weight_pubs`
+- Interpretation: predicted observed EID event risk under current reporting effort
+- Color scale: anchored at `0` and clipped at `mean + 2.5 SD` to better match the published Figure 3A appearance
+
+```{r optional-save, eval=FALSE}
+ggsave("fig_3a_infectious_diseases.png", fig_3a_plot, width = 11, height = 6.5, dpi = 300)
+```
