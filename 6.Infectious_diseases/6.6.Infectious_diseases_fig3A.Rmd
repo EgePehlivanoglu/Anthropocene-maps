@@ -161,5 +161,5 @@ fig_3a_plot
 - Color scale: anchored at `0` and clipped at `mean + 2.5 SD` to better match the published Figure 3A appearance
 
 ```{r optional-save, eval=FALSE}
-ggsave("fig_3a_infectious_diseases.png", fig_3a_plot, width = 11, height = 6.5, dpi = 300)
+ggsave("6.6.fig_3a_infectious_diseases.png", fig_3a_plot, width = 11, height = 6.5, dpi = 300)
 ```
