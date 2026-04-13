@@ -112,7 +112,7 @@ fig_3a_plot <- ggplot() +
     inherit.aes = FALSE,
     fill = viridis::viridis(1)
   ) +
-  geom_raster(
+  geom_tile(
     aes(x = x, y = y, fill = risk),
     data = fig3a_df
   ) +
@@ -121,7 +121,7 @@ fig_3a_plot <- ggplot() +
     data = world_df,
     inherit.aes = FALSE,
     color = "white",
-    linewidth = 0.05
+    linewidth = 0.1
   ) +
   coord_fixed(xlim = c(-180, 180), ylim = c(-65, 90), expand = FALSE) +
   scale_fill_gradientn(
