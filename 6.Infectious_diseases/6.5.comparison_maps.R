@@ -163,7 +163,7 @@ top5_presence_zero <- terra::ifel(is.na(top5_presence), 0, top5_presence)
 names(top5_presence_zero) <- "presence"
 
 # ---- 3) publication-style single-map overlay ----
-overlay_plot <- ggplot() +
+fig3B_overlay_plot <- ggplot() +
   geom_tile(
     data = binary_sum_df,
     aes(x = x, y = y, fill = sum_binary_cat)
@@ -171,7 +171,7 @@ overlay_plot <- ggplot() +
   geom_tile(
     data = top5_presence_df,
     aes(x = x, y = y),
-    fill = "black",
+    fill = "yellow",
     alpha = 0.28
   ) +
   geom_sf(data = world_moll, fill = NA, color = "grey10", linewidth = 0.05) +
@@ -188,9 +188,9 @@ overlay_plot <- ggplot() +
     name = "Summed\nbinary layers"
   ) +
   labs(
-    title = "Overlay of summed binary pressures and infectious disease hotspots",
-    subtitle = "Black overlay marks cells in the top 5% of infectious disease risk",
-    caption = "Recommended for publication only when accompanied by the side-by-side comparison panel.",
+    title = "Comparison Overlay: Figure 3B and Summed Binary Pressure",
+    subtitle = "Black overlay marks the top 5% of Figure 3B (weighted by population density) infectious disease risk",
+    caption = "The Figure 3B top 5% subset is calculated after excluding 0s and NAs from the Figure 3B risk surface.",
     x = NULL, y = NULL
   ) +
   theme_minimal(base_size = 11) +
@@ -201,5 +201,5 @@ overlay_plot <- ggplot() +
     legend.title = element_text(face = "bold"),
     plot.title = element_text(face = "bold")
   )
-overlay_plot
+fig3B_overlay_plot
 

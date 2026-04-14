@@ -274,3 +274,47 @@ fig3a_overlay_plot
 ggsave("6.6.fig_3a_infectious_diseases.png", fig_3a_plot, width = 11, height = 6.5, dpi = 300)
 ggsave("6.6.fig_3a_overlay_comparison.png", fig3a_overlay_plot, width = 8, height = 6.5, dpi = 300)
 ```
+
+# 8. Save Figure 3A and Figure 3B overlays side by side
+
+```{r save-both-overlays}
+fig3b_env <- new.env(parent = globalenv())
+sys.source("6.5.comparison_maps.R", envir = fig3b_env)
+fig3b_overlay_plot <- get("fig3B_overlay_plot", envir = fig3b_env)
+
+fig3a_overlay_export <- fig3a_overlay_plot +
+  labs(
+    title = "A. Figure 3A overlay",
+    subtitle = "Top 5% of observed EID risk over summed binary pressure (weighted model output with current reporting effort)"
+  )
+
+fig3b_overlay_export <- fig3b_overlay_plot +
+  labs(
+    title = "B. Figure 3B overlay",
+    subtitle = "Top 5% of bias-corrected EID risk over summed binary pressure (weighted model output reweighted by population)"
+  )
+
+pdf("6.6.fig3A_fig3B_overlay_comparison.pdf", width = 16, height = 6.5)
+grid::grid.newpage()
+grid::pushViewport(
+  grid::viewport(layout = grid::grid.layout(nrow = 1, ncol = 2))
+)
+print(fig3a_overlay_export, vp = grid::viewport(layout.pos.row = 1, layout.pos.col = 1))
+print(fig3b_overlay_export, vp = grid::viewport(layout.pos.row = 1, layout.pos.col = 2))
+dev.off()
+
+png(
+  "6.6.fig3A_fig3B_overlay_comparison.png",
+  width = 16,
+  height = 6.5,
+  units = "in",
+  res = 300
+)
+grid::grid.newpage()
+grid::pushViewport(
+  grid::viewport(layout = grid::grid.layout(nrow = 1, ncol = 2))
+)
+print(fig3a_overlay_export, vp = grid::viewport(layout.pos.row = 1, layout.pos.col = 1))
+print(fig3b_overlay_export, vp = grid::viewport(layout.pos.row = 1, layout.pos.col = 2))
+dev.off()
+```
