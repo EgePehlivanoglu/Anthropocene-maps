@@ -228,10 +228,10 @@ fig3a_overlay_plot <- ggplot() +
   geom_tile(
     data = fig3a_top5_presence_df,
     aes(x = x, y = y),
-    fill = "black",
+    fill = "yellow",
     alpha = 0.28
   ) +
-  geom_sf(data = world_moll, fill = NA, color = "grey10", linewidth = 0.05) +
+  geom_sf(data = world_moll, fill = NA, color ="grey10", linewidth = 0.05) +
   coord_sf(crs = st_crs(target_crs), expand = FALSE) +
   scale_fill_manual(
     values = c(
