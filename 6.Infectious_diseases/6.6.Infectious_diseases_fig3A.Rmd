@@ -154,12 +154,123 @@ fig_3a_plot <- ggplot() +
 fig_3a_plot
 ```
 
-# 6. Notes
+# 6. Comparison Overlay with the Summed Binary Pressure Surface
+
+This section uses the same overlay approach as the comparison workflow in `6.5.comparison_maps.R`. The summed binary surface is loaded from the precomputed `summed_binary_context.rds` file, and the top `5%` of the Figure 3A risk surface is overlaid in black.
+
+```{r comparison-overlay}
+sum_context_path <- "/Users/egepehlivanoglu/Library/CloudStorage/OneDrive-StockholmUniversity/KVA backup/KVAOneDrive_backup_28Jan2026/2. Projects/4.Cascades/Editorial Review 20250807/map/Anthropocene-maps/summed_binary_context.rds"
+
+stopifnot(file.exists(sum_context_path))
+sum_context <- readRDS(sum_context_path)
+
+target_crs <- sum_context$target_crs
+target_res <- sum_context$target_res
+
+rebuild_extent_from_df <- function(df, res_xy) {
+  terra::ext(
+    min(df$x, na.rm = TRUE) - res_xy[1] / 2,
+    max(df$x, na.rm = TRUE) + res_xy[1] / 2,
+    min(df$y, na.rm = TRUE) - res_xy[2] / 2,
+    max(df$y, na.rm = TRUE) + res_xy[2] / 2
+  )
+}
+
+binary_sum_df <- sum_context$binary_sum_df %>%
+  dplyr::mutate(sum_binary_cat = factor(sum_binary, levels = c(0, 1, 2, 3, 4)))
+
+target_extent <- if (!is.null(sum_context$target_extent)) {
+  do.call(terra::ext, as.list(sum_context$target_extent))
+} else {
+  rebuild_extent_from_df(binary_sum_df, target_res)
+}
+
+world_moll <- if (!is.null(sum_context$world_moll)) {
+  sum_context$world_moll
+} else {
+  sf::st_transform(
+    rnaturalearth::ne_countries(scale = "medium", returnclass = "sf"),
+    crs = target_crs
+  )
+}
+
+common_template_raster <- terra::rast(
+  ext = target_extent,
+  resolution = target_res,
+  crs = target_crs
+)
+
+fig3a_hist_df <- fig3a_df %>%
+  dplyr::filter(!is.na(risk) & risk > 0)
+
+fig3a_top5_cutoff <- stats::quantile(fig3a_hist_df$risk, probs = 0.95, na.rm = TRUE)
+fig3a_top5_df <- fig3a_hist_df %>%
+  dplyr::filter(risk >= fig3a_top5_cutoff)
+
+fig3a_top5_vect <- terra::vect(fig3a_top5_df, geom = c("x", "y"), crs = "EPSG:4326")
+fig3a_top5_vect_moll <- terra::project(fig3a_top5_vect, target_crs)
+fig3a_top5_raster <- terra::rasterize(
+  fig3a_top5_vect_moll,
+  common_template_raster,
+  field = "risk",
+  fun = "max"
+)
+
+fig3a_top5_presence <- terra::ifel(is.na(fig3a_top5_raster), NA, 1)
+names(fig3a_top5_presence) <- "presence"
+fig3a_top5_presence_df <- as.data.frame(fig3a_top5_presence, xy = TRUE, na.rm = TRUE)
+
+fig3a_overlay_plot <- ggplot() +
+  geom_tile(
+    data = binary_sum_df,
+    aes(x = x, y = y, fill = sum_binary_cat)
+  ) +
+  geom_tile(
+    data = fig3a_top5_presence_df,
+    aes(x = x, y = y),
+    fill = "black",
+    alpha = 0.28
+  ) +
+  geom_sf(data = world_moll, fill = NA, color = "grey10", linewidth = 0.05) +
+  coord_sf(crs = st_crs(target_crs), expand = FALSE) +
+  scale_fill_manual(
+    values = c(
+      "0" = "#f7f7f7",
+      "1" = "#d9e6f2",
+      "2" = "#92b4d6",
+      "3" = "#477db3",
+      "4" = "#123b6d"
+    ),
+    na.value = "white",
+    name = "Summed\nbinary layers"
+  ) +
+  labs(
+    title = "Comparison Overlay: Figure 3A and Summed Binary Pressure",
+    subtitle = "Black overlay marks the top 5% of Figure 3A infectious disease risk",
+    caption = "The Figure 3A top 5% subset is calculated after excluding 0s and NAs from the Figure 3A risk surface.",
+    x = NULL,
+    y = NULL
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(
+    panel.grid = element_blank(),
+    axis.text = element_blank(),
+    legend.position = "right",
+    legend.title = element_text(face = "bold"),
+    plot.title = element_text(face = "bold")
+  )
+
+fig3a_overlay_plot
+```
+
+# 7. Notes
 
 - Variable used: `bsm_weight_pubs`
 - Interpretation: predicted observed EID event risk under current reporting effort
 - Color scale: anchored at `0` and clipped at `mean + 2.5 SD` to better match the published Figure 3A appearance
+- Comparison overlay: uses the top `5%` of the Figure 3A risk surface after excluding `0s` and `NAs`
 
 ```{r optional-save, eval=FALSE}
 ggsave("6.6.fig_3a_infectious_diseases.png", fig_3a_plot, width = 11, height = 6.5, dpi = 300)
+ggsave("6.6.fig_3a_overlay_comparison.png", fig3a_overlay_plot, width = 8, height = 6.5, dpi = 300)
 ```
