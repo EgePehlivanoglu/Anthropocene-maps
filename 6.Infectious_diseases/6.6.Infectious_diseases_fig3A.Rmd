@@ -263,19 +263,12 @@ fig3a_overlay_plot <- ggplot() +
 fig3a_overlay_plot
 ```
 
-# 7. Notes
+# 7. Save Figure 3A and Figure 3B overlays side by side
 
 - Variable used: `bsm_weight_pubs`
 - Interpretation: predicted observed EID event risk under current reporting effort
 - Color scale: anchored at `0` and clipped at `mean + 2.5 SD` to better match the published Figure 3A appearance
 - Comparison overlay: uses the top `5%` of the Figure 3A risk surface after excluding `0s` and `NAs`
-
-```{r optional-save, eval=FALSE}
-ggsave("6.6.fig_3a_infectious_diseases.png", fig_3a_plot, width = 11, height = 6.5, dpi = 300)
-ggsave("6.6.fig_3a_overlay_comparison.png", fig3a_overlay_plot, width = 8, height = 6.5, dpi = 300)
-```
-
-# 8. Save Figure 3A and Figure 3B overlays side by side
 
 ```{r save-both-overlays}
 fig3b_env <- new.env(parent = globalenv())
@@ -316,5 +309,102 @@ grid::pushViewport(
 )
 print(fig3a_overlay_export, vp = grid::viewport(layout.pos.row = 1, layout.pos.col = 1))
 print(fig3b_overlay_export, vp = grid::viewport(layout.pos.row = 1, layout.pos.col = 2))
+dev.off()
+```
+
+# 8. Polytroubles Comparison for Figure 3A and Figure 3B
+
+This comparison keeps the same yellow infectious overlays, but only colors summed-binary classes `2` and `3`. Classes `0`, `1`, and `NA` are shown alike.
+
+```{r polytroubles-comparison}
+fig3b_env <- new.env(parent = globalenv())
+sys.source("6.5.comparison_maps.R", envir = fig3b_env)
+
+fig3b_top5_presence_df <- get("top5_presence_df", envir = fig3b_env)
+fig3b_world_moll <- get("world_moll", envir = fig3b_env)
+fig3b_target_crs <- get("target_crs", envir = fig3b_env)
+fig3b_binary_sum_df <- get("binary_sum_df", envir = fig3b_env)
+
+make_polytroubles_plot <- function(sum_df, overlay_df, world_sf, crs_string, title_text, subtitle_text) {
+  poly_df <- sum_df %>%
+    dplyr::mutate(
+      poly_class = dplyr::case_when(
+        sum_binary == 2 ~ "2",
+        sum_binary == 3 ~ "3",
+        TRUE ~ NA_character_
+      ),
+      poly_class = factor(poly_class, levels = c("2", "3"))
+    )
+
+  ggplot() +
+    geom_tile(
+      data = poly_df,
+      aes(x = x, y = y, fill = poly_class)
+    ) +
+    geom_tile(
+      data = overlay_df,
+      aes(x = x, y = y),
+      fill = "yellow",
+      alpha = 0.28
+    ) +
+    geom_sf(data = world_sf, fill = NA, color = "grey10", linewidth = 0.05) +
+    coord_sf(crs = st_crs(crs_string), expand = FALSE) +
+    scale_fill_manual(
+      values = c(
+        "2" = "#92b4d6",
+        "3" = "#477db3"
+      ),
+      na.value = "white",
+      name = "Summed\nbinary layers"
+    ) +
+    labs(
+      title = title_text,
+      subtitle = subtitle_text,
+      caption = "Only summed-binary classes 2 and 3 are colored; 0, 1, and NA are shown alike.",
+      x = NULL,
+      y = NULL
+    ) +
+    theme_minimal(base_size = 11) +
+    theme(
+      panel.grid = element_blank(),
+      axis.text = element_blank(),
+      legend.position = "right",
+      legend.title = element_text(face = "bold"),
+      plot.title = element_text(face = "bold")
+    )
+}
+
+fig3a_polytroubles_plot <- make_polytroubles_plot(
+  sum_df = binary_sum_df,
+  overlay_df = fig3a_top5_presence_df,
+  world_sf = world_moll,
+  crs_string = target_crs,
+  title_text = "A. Figure 3A polytroubles",
+  subtitle_text = "Top 5% of observed EID risk over summed-binary classes 2 and 3"
+)
+
+fig3b_polytroubles_plot <- make_polytroubles_plot(
+  sum_df = fig3b_binary_sum_df,
+  overlay_df = fig3b_top5_presence_df,
+  world_sf = fig3b_world_moll,
+  crs_string = fig3b_target_crs,
+  title_text = "B. Figure 3B polytroubles",
+  subtitle_text = "Top 5% of bias-corrected EID risk over summed-binary classes 2 and 3"
+)
+
+grid::grid.newpage()
+grid::pushViewport(
+  grid::viewport(layout = grid::grid.layout(nrow = 1, ncol = 2))
+)
+print(fig3a_polytroubles_plot, vp = grid::viewport(layout.pos.row = 1, layout.pos.col = 1))
+print(fig3b_polytroubles_plot, vp = grid::viewport(layout.pos.row = 1, layout.pos.col = 2))
+
+pdf("6.6.fig3A_fig3B_polytroubles_comparison.pdf", width = 16, height = 6.5)
+grid::grid.newpage()
+grid::pushViewport(
+  grid::viewport(layout = grid::grid.layout(nrow = 1, ncol = 2))
+)
+print(fig3a_polytroubles_plot, vp = grid::viewport(layout.pos.row = 1, layout.pos.col = 1))
+print(fig3b_polytroubles_plot, vp = grid::viewport(layout.pos.row = 1, layout.pos.col = 2))
 dev.off()
 ```
