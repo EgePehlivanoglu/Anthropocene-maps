@@ -1,0 +1,265 @@
+---
+title: "Figure 3B Polytroubles With Yellow and Green Classes"
+output:
+  html_document:
+    toc: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+project_root <- "/Users/egepehlivanoglu/Library/CloudStorage/OneDrive-StockholmUniversity/KVA backup/KVAOneDrive_backup_28Jan2026/2. Projects/4.Cascades/Editorial Review 20250807/map/Anthropocene-maps"
+knitr::opts_knit$set(root.dir = project_root)
+
+if (!requireNamespace("librarian", quietly = TRUE)) {
+  install.packages("librarian", repos = "https://cloud.r-project.org")
+}
+
+library(librarian)
+librarian::shelf(
+  terra,
+  sf,
+  ggplot2,
+  dplyr,
+  tidyr,
+  rnaturalearth,
+  knitr
+)
+```
+
+# Purpose
+
+This notebook rebuilds the Figure 3B polytroubles map directly, using the same
+classification logic used for the Figure 3A polytroubles map.
+
+The key classes are:
+
+- `eid`: Figure 3B top 5% EID risk only, shown in yellow
+- `sum2_eid`: summed pressure class 2 plus Figure 3B top 5% EID risk, shown in light green
+- `sum3_eid`: summed pressure class 3 plus Figure 3B top 5% EID risk, shown in dark green
+
+The plot is rebuilt from data, rather than reusing the old `fig3B_polytroubles_plot`
+object from `6.5`.
+
+# 1. Load Summed Binary Pressure Context
+
+```{r load-summed-pressure}
+sum_context_path <- file.path(project_root, "summed_binary_context.rds")
+stopifnot(file.exists(sum_context_path))
+
+sum_context <- readRDS(sum_context_path)
+
+target_crs <- sum_context$target_crs
+target_res <- sum_context$target_res
+
+binary_sum_df <- sum_context$binary_sum_df %>%
+  dplyr::mutate(
+    sum_binary = as.numeric(sum_binary),
+    sum_binary_cat = factor(sum_binary, levels = c(0, 1, 2, 3, 4))
+  )
+
+rebuild_extent_from_df <- function(df, res_xy) {
+  terra::ext(
+    min(df$x, na.rm = TRUE) - res_xy[1] / 2,
+    max(df$x, na.rm = TRUE) + res_xy[1] / 2,
+    min(df$y, na.rm = TRUE) - res_xy[2] / 2,
+    max(df$y, na.rm = TRUE) + res_xy[2] / 2
+  )
+}
+
+target_extent <- if (!is.null(sum_context$target_extent)) {
+  do.call(terra::ext, as.list(sum_context$target_extent))
+} else {
+  rebuild_extent_from_df(binary_sum_df, target_res)
+}
+
+common_template_raster <- terra::rast(
+  ext = target_extent,
+  resolution = target_res,
+  crs = target_crs
+)
+
+world_moll <- if (!is.null(sum_context$world_moll)) {
+  sum_context$world_moll
+} else {
+  sf::st_transform(
+    rnaturalearth::ne_countries(scale = "medium", returnclass = "sf"),
+    crs = target_crs
+  )
+}
+```
+
+# 2. Reproduce Figure 3B Risk Surface
+
+```{r source-fig3b}
+fig3b_script <- file.path(
+  project_root,
+  "6.Infectious_diseases",
+  "6.2.Alan_et.al_fig3B_reproduced.R"
+)
+
+stopifnot(file.exists(fig3b_script))
+
+fig3b_env <- new.env(parent = globalenv())
+sys.source(fig3b_script, envir = fig3b_env)
+
+fig3b_df <- get("fig3b_df", envir = fig3b_env)
+```
+
+# 3. Convert Figure 3B Top 5% Risk to the Common Grid
+
+```{r fig3b-top5-presence}
+fig3b_hist_df <- fig3b_df %>%
+  dplyr::filter(!is.na(risk), risk > 0)
+
+fig3b_top5_cutoff <- stats::quantile(
+  fig3b_hist_df$risk,
+  probs = 0.95,
+  na.rm = TRUE
+)
+
+fig3b_top5_df <- fig3b_hist_df %>%
+  dplyr::filter(risk >= fig3b_top5_cutoff)
+
+fig3b_top5_vect <- terra::vect(
+  fig3b_top5_df,
+  geom = c("x", "y"),
+  crs = "EPSG:4326"
+)
+
+fig3b_top5_vect_moll <- terra::project(fig3b_top5_vect, target_crs)
+
+fig3b_top5_raster <- terra::rasterize(
+  fig3b_top5_vect_moll,
+  common_template_raster,
+  field = "risk",
+  fun = "max"
+)
+names(fig3b_top5_raster) <- "risk"
+
+fig3b_top5_presence <- terra::ifel(is.na(fig3b_top5_raster), NA, 1)
+names(fig3b_top5_presence) <- "presence"
+
+fig3b_top5_presence_df <- as.data.frame(
+  fig3b_top5_presence,
+  xy = TRUE,
+  na.rm = TRUE
+)
+
+fig3b_top5_cutoff
+```
+
+# 4. Build Fig 3B Polytroubles Classes
+
+```{r build-polytroubles}
+highlight_pressure_values <- c(2, 3)
+
+fig3b_overlay_class_df <- fig3b_top5_presence_df %>%
+  dplyr::transmute(x, y, infectious_presence = 1L)
+
+fig3B_polytroubles_df <- binary_sum_df %>%
+  dplyr::select(x, y, sum_binary) %>%
+  dplyr::left_join(fig3b_overlay_class_df, by = c("x", "y")) %>%
+  dplyr::mutate(
+    infectious_presence = tidyr::replace_na(infectious_presence, 0L),
+    poly_class = dplyr::case_when(
+      sum_binary == 2 & infectious_presence == 0L ~ "sum2",
+      sum_binary == 3 & infectious_presence == 0L ~ "sum3",
+      infectious_presence == 1L &
+        (is.na(sum_binary) | !(sum_binary %in% highlight_pressure_values)) ~ "eid",
+      sum_binary == 2 & infectious_presence == 1L ~ "sum2_eid",
+      sum_binary == 3 & infectious_presence == 1L ~ "sum3_eid",
+      TRUE ~ NA_character_
+    ),
+    poly_class = factor(
+      poly_class,
+      levels = c("sum2", "sum3", "eid", "sum2_eid", "sum3_eid")
+    )
+  )
+
+fig3B_polytroubles_counts <- fig3B_polytroubles_df %>%
+  dplyr::count(poly_class, .drop = FALSE)
+
+fig3B_polytroubles_counts
+
+eid_only_n <- fig3B_polytroubles_counts$n[
+  fig3B_polytroubles_counts$poly_class == "eid"
+]
+
+if (length(eid_only_n) == 1 && eid_only_n == 0) {
+  message(
+    "No yellow cells are present under the Fig 3A-style definition: ",
+    "all Figure 3B top 5% EID cells overlap summed-pressure class 2 or 3."
+  )
+}
+```
+
+# 5. Plot Figure 3B Polytroubles
+
+```{r plot-polytroubles, fig.width=11, fig.height=6.5}
+polytroubles_palette <- c(
+  "sum2" = "#9ecae1",
+  "sum3" = "#3182bd",
+  "eid" = "#ffd54f",
+  "sum2_eid" = "#78c679",
+  "sum3_eid" = "#238443"
+)
+
+polytroubles_labels <- c(
+  "sum2" = "Summed pressure 2 only",
+  "sum3" = "Summed pressure 3 only",
+  "eid" = "Top 5% EID only",
+  "sum2_eid" = "Overlap: 2 + EID",
+  "sum3_eid" = "Overlap: 3 + EID"
+)
+
+fig3B_polytroubles_plot <- ggplot() +
+  geom_tile(
+    data = fig3B_polytroubles_df,
+    aes(x = x, y = y, fill = poly_class)
+  ) +
+  geom_sf(data = world_moll, fill = NA, color = "grey10", linewidth = 0.05) +
+  coord_sf(crs = sf::st_crs(target_crs), expand = FALSE) +
+  scale_fill_manual(
+    values = polytroubles_palette,
+    labels = polytroubles_labels,
+    drop = FALSE,
+    na.value = "white",
+    name = "Map class"
+  ) +
+  labs(
+    title = "Figure 3B polytroubles",
+    subtitle = "Top 5% bias-corrected EID risk, summed pressure, and overlap shown as separate classes",
+    caption = "Yellow shows Figure 3B top 5% EID cells outside summed-pressure classes 2 and 3. Green shows overlap with summed-pressure classes 2 or 3.",
+    x = NULL,
+    y = NULL
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(
+    panel.grid = element_blank(),
+    axis.text = element_blank(),
+    legend.position = "right",
+    legend.title = element_text(face = "bold"),
+    plot.title = element_text(face = "bold")
+  )
+
+fig3B_polytroubles_plot
+```
+
+# 6. Save Outputs
+
+```{r save-output}
+ggplot2::ggsave(
+  filename = file.path("6.Infectious_diseases", "6.7.fig3B_polytroubles_yellow_green.png"),
+  plot = fig3B_polytroubles_plot,
+  width = 11,
+  height = 6.5,
+  dpi = 300
+)
+
+ggplot2::ggsave(
+  filename = file.path("6.Infectious_diseases", "6.7.fig3B_polytroubles_yellow_green.pdf"),
+  plot = fig3B_polytroubles_plot,
+  width = 11,
+  height = 6.5
+)
+```

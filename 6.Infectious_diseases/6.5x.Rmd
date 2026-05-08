@@ -1,0 +1,436 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+# 6.5x Fig 3B overlap reproduced from 6.6.
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+
+if (!requireNamespace("librarian", quietly = TRUE)) {
+  install.packages("librarian", repos = "https://cloud.r-project.org")
+}
+
+library(librarian)
+shelf(raster, terra, sf, sp, rnaturalearth, tidyverse, viridis, maps)
+```
+
+# Overview
+
+This document reproduces Figure 3B from Allen et al. (2017), *Global hotspots and correlates of emerging zoonotic diseases*.
+
+Figure 3A is the predicted distribution of observed zoonotic EID event risk, using the weighted model output with current reporting effort.
+
+Source:
+[Allen et al. (2017), Nature Communications](https://www.nature.com/articles/s41467-017-00923-8)
+
+# 1. Load archived model predictions
+
+```{r load-predictions}
+# predictions_path <- "~/Library/CloudStorage/OneDrive-StockholmUniversity/KVA backup/KVAOneDrive_backup_28Jan2026/2. Projects/4.Cascades/Editorial Review 20250807/map/Base maps/6.Infectious_diseases/Allen 2017/predictions.RData"
+# 
+# stopifnot(file.exists(path.expand(predictions_path)))
+# load(path.expand(predictions_path))  # loads object: predictions
+# 
+# predictions <- predictions %>%
+#   dplyr::select(gridid, lon, lat, bsm_weight_pubs) %>%
+#   dplyr::filter(
+#     is.finite(lon),
+#     is.finite(lat),
+#     is.finite(bsm_weight_pubs)
+#   )
+```
+
+# 2. Helper functions
+
+```{r helpers}
+# clip_at_sd <- function(x, multiple = 1) {
+#   m <- mean(x, na.rm = TRUE)
+#   s <- sd(x, na.rm = TRUE) * multiple
+#   x %>%
+#     pmin(m + s) %>%
+#     pmax(m - s)
+# }
+# 
+# template_raster <- function(df) {
+#   template_df <- df %>%
+#     dplyr::select(lon, lat, gridid)
+#   sp::coordinates(template_df) <- c("lon", "lat")
+#   sp::gridded(template_df) <- TRUE
+#   sp::proj4string(template_df) <- sp::CRS(
+#     "+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"
+#   )
+#   raster::raster(template_df)
+# }
+```
+
+# 3. Apply the figure scaling
+
+The paper states that Figure 3 maps were created using standard deviation scaling. Because the `bsm_weight_pubs` surface is strictly positive, this reproduction anchors the lower bound at `0` and uses `mean + 2.5 SD` as the upper color limit so the visual contrast better matches the published figure.
+
+```{r scale-values}
+# eid_mean <- mean(predictions$bsm_weight_pubs, na.rm = TRUE)
+# eid_sd <- sd(predictions$bsm_weight_pubs, na.rm = TRUE)
+# eid_lower <- 0
+# eid_upper <- eid_mean + 2.5 * eid_sd
+# 
+# predictions$bsm_weight_pubs_clipped <- clip_at_sd(predictions$bsm_weight_pubs, 2.5)
+```
+
+# 4. Build the raster surface
+
+```{r build-raster}
+country_outlines <- terra::vect(
+  sf::st_transform(
+    rnaturalearth::ne_countries(scale = "medium", returnclass = "sf"),
+    crs = "EPSG:4326"
+  )
+)
+
+fig3a_raster <- predictions %>%
+  dplyr::select(x = lon, y = lat, z = bsm_weight_pubs_clipped) %>%
+  raster::rasterFromXYZ(crs = raster::crs(template_raster(predictions))) %>%
+  raster::disaggregate(2, method = "bilinear")
+
+fig3a_raster <- terra::rast(fig3a_raster)
+terra::crs(fig3a_raster) <- "EPSG:4326"
+fig3a_raster <- terra::mask(fig3a_raster, country_outlines)
+names(fig3a_raster) <- "risk"
+
+fig3a_df <- as.data.frame(fig3a_raster, xy = TRUE) %>%
+  stats::na.omit()
+
+world_df <- ggplot2::map_data("world")
+```
+
+# 5. Plot Figure 3A
+
+```{r plot-fig3a}
+fig_3a_plot <- ggplot() +
+  geom_polygon(
+    aes(x = long, y = lat, group = group),
+    data = world_df,
+    inherit.aes = FALSE,
+    fill = viridis::viridis(1)
+  ) +
+  geom_tile(
+    aes(x = x, y = y, fill = risk),
+    data = fig3a_df
+  ) +
+  geom_path(
+    aes(x = long, y = lat, group = group),
+    data = world_df,
+    inherit.aes = FALSE,
+    color = "white",
+    linewidth = 0.1
+  ) +
+  coord_fixed(xlim = c(-180, 180), ylim = c(-65, 90), expand = FALSE) +
+  scale_fill_gradientn(
+    colours = viridis::viridis(256),
+    limits = c(eid_lower, eid_upper),
+    oob = scales::squish,
+    guide = guide_colorbar(
+      label = TRUE,
+      label.position = "right",
+      title = "Observed EID risk index\n(0 to +2.5 SD)"
+    )
+  ) +
+  theme(
+    panel.background = element_rect(fill = "black"),
+    plot.background = element_rect(fill = "black"),
+    line = element_blank(),
+    legend.title = element_text(color = "white", size = 8),
+    legend.text = element_text(color = "white", size = 8),
+    legend.title.align = 0,
+    legend.background = element_blank(),
+    legend.position = c(0.11, 0.45)
+  ) +
+  labs(
+    title = "Figure 3A reproduction",
+    subtitle = "Weighted model output with current reporting effort",
+    x = NULL,
+    y = NULL
+  )
+
+fig_3a_plot
+```
+
+# 6. Comparison Overlay with the Summed Binary Pressure Surface
+
+This section uses the same overlay approach as the comparison workflow in `6.5.comparison_maps.R`. The summed binary surface is loaded from the precomputed `summed_binary_context.rds` file, and the top `5%` of the Figure 3A risk surface is overlaid in black.
+
+```{r comparison-overlay}
+sum_context_path <- "/Users/egepehlivanoglu/Library/CloudStorage/OneDrive-StockholmUniversity/KVA backup/KVAOneDrive_backup_28Jan2026/2. Projects/4.Cascades/Editorial Review 20250807/map/Anthropocene-maps/summed_binary_context.rds"
+
+stopifnot(file.exists(sum_context_path))
+sum_context <- readRDS(sum_context_path)
+
+target_crs <- sum_context$target_crs
+target_res <- sum_context$target_res
+
+rebuild_extent_from_df <- function(df, res_xy) {
+  terra::ext(
+    min(df$x, na.rm = TRUE) - res_xy[1] / 2,
+    max(df$x, na.rm = TRUE) + res_xy[1] / 2,
+    min(df$y, na.rm = TRUE) - res_xy[2] / 2,
+    max(df$y, na.rm = TRUE) + res_xy[2] / 2
+  )
+}
+
+binary_sum_df <- sum_context$binary_sum_df %>%
+  dplyr::mutate(sum_binary_cat = factor(sum_binary, levels = c(0, 1, 2, 3, 4)))
+
+target_extent <- if (!is.null(sum_context$target_extent)) {
+  do.call(terra::ext, as.list(sum_context$target_extent))
+} else {
+  rebuild_extent_from_df(binary_sum_df, target_res)
+}
+
+world_moll <- if (!is.null(sum_context$world_moll)) {
+  sum_context$world_moll
+} else {
+  sf::st_transform(
+    rnaturalearth::ne_countries(scale = "medium", returnclass = "sf"),
+    crs = target_crs
+  )
+}
+
+common_template_raster <- terra::rast(
+  ext = target_extent,
+  resolution = target_res,
+  crs = target_crs
+)
+
+### NEW #######
+setwd("/Users/egepehlivanoglu/Library/CloudStorage/OneDrive-StockholmUniversity/KVA backup/KVAOneDrive_backup_28Jan2026/2. Projects/4.Cascades/Editorial Review 20250807/map/Anthropocene-maps/6.Infectious_diseases")
+source("6.2.Alan_et.al_fig3B_reproduced.R")
+
+hist_df <- fig3b_df %>%
+  dplyr::filter(!is.na(risk) & risk > 0)
+
+top5_cutoff <- stats::quantile(hist_df$risk, probs = 0.95, na.rm = TRUE)
+top5_fig3b_df <- hist_df %>%
+  dplyr::filter(risk >= top5_cutoff)
+############
+
+# fig3a_hist_df <- fig3a_df %>%
+#   dplyr::filter(!is.na(risk) & risk > 0)
+# 
+# fig3a_top5_cutoff <- stats::quantile(fig3a_hist_df$risk, probs = 0.95, na.rm = TRUE)
+# fig3a_top5_df <- fig3a_hist_df %>%
+#   dplyr::filter(risk >= fig3a_top5_cutoff)
+
+top5_fig3b_df_vect <- terra::vect(top5_fig3b_df, geom = c("x", "y"), crs = "EPSG:4326")
+fig3b_top5_vect_moll <- terra::project(top5_fig3b_df_vect, target_crs)
+fig3b_top5_raster <- terra::rasterize(
+  fig3b_top5_vect_moll,
+  common_template_raster,
+  field = "risk",
+  fun = "max"
+)
+
+fig3b_top5_presence <- terra::ifel(is.na(fig3b_top5_raster), NA, 1)
+names(fig3b_top5_presence) <- "presence"
+fig3a_top5_presence_df <- as.data.frame(fig3b_top5_presence, xy = TRUE, na.rm = TRUE)
+
+fig3b_overlay_plot <- ggplot() +
+  geom_tile(
+    data = binary_sum_df,
+    aes(x = x, y = y, fill = sum_binary_cat)
+  ) +
+  geom_tile(
+    data = fig3a_top5_presence_df,
+    aes(x = x, y = y),
+    fill = "yellow",
+    alpha = 0.28
+  ) +
+  geom_sf(data = world_moll, fill = NA, color ="grey10", linewidth = 0.05) +
+  coord_sf(crs = st_crs(target_crs), expand = FALSE) +
+  scale_fill_manual(
+    values = c(
+      "0" = "#f7f7f7",
+      "1" = "#d9e6f2",
+      "2" = "#92b4d6",
+      "3" = "#477db3",
+      "4" = "#123b6d"
+    ),
+    na.value = "white",
+    name = "Summed\nbinary layers"
+  ) +
+  labs(
+    title = "Comparison Overlay: Figure 3A and Summed Binary Pressure",
+    subtitle = "Black overlay marks the top 5% of Figure 3A infectious disease risk",
+    caption = "The Figure 3A top 5% subset is calculated after excluding 0s and NAs from the Figure 3A risk surface.",
+    x = NULL,
+    y = NULL
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(
+    panel.grid = element_blank(),
+    axis.text = element_blank(),
+    legend.position = "right",
+    legend.title = element_text(face = "bold"),
+    plot.title = element_text(face = "bold")
+  )
+
+fig3b_overlay_plot
+```
+
+# 7. Save Figure 3A and Figure 3B overlays side by side
+
+- Variable used: `bsm_weight_pubs`
+- Interpretation: predicted observed EID event risk under current reporting effort
+- Color scale: anchored at `0` and clipped at `mean + 2.5 SD` to better match the published Figure 3A appearance
+- Comparison overlay: uses the top `5%` of the Figure 3A risk surface after excluding `0s` and `NAs`
+
+```{r save-both-overlays}
+# fig3b_env <- new.env(parent = globalenv())
+# sys.source("6.5.comparison_maps.R", envir = fig3b_env)
+# fig3b_overlay_plot <- get("fig3B_overlay_plot", envir = fig3b_env)
+# 
+# fig3a_overlay_export <- fig3a_overlay_plot +
+#   labs(
+#     title = "A. Figure 3A overlay",
+#     subtitle = "Top 5% of observed EID risk over summed binary pressure (weighted model output with current reporting effort)"
+#   )
+# 
+# fig3b_overlay_export <- fig3b_overlay_plot +
+#   labs(
+#     title = "B. Figure 3B overlay",
+#     subtitle = "Top 5% of bias-corrected EID risk over summed binary pressure (weighted model output reweighted by population)"
+#   )
+# 
+# pdf("6.6.fig3A_fig3B_overlay_comparison.pdf", width = 16, height = 6.5)
+# grid::grid.newpage()
+# grid::pushViewport(
+#   grid::viewport(layout = grid::grid.layout(nrow = 1, ncol = 2))
+# )
+# print(fig3a_overlay_export, vp = grid::viewport(layout.pos.row = 1, layout.pos.col = 1))
+# print(fig3b_overlay_export, vp = grid::viewport(layout.pos.row = 1, layout.pos.col = 2))
+# dev.off()
+# 
+# png(
+#   "6.6.fig3A_fig3B_overlay_comparison.png",
+#   width = 16,
+#   height = 6.5,
+#   units = "in",
+#   res = 300
+# )
+# grid::grid.newpage()
+# grid::pushViewport(
+#   grid::viewport(layout = grid::grid.layout(nrow = 1, ncol = 2))
+# )
+# print(fig3a_overlay_export, vp = grid::viewport(layout.pos.row = 1, layout.pos.col = 1))
+# print(fig3b_overlay_export, vp = grid::viewport(layout.pos.row = 1, layout.pos.col = 2))
+# dev.off()
+```
+
+# 8. Polytroubles Comparison for Figure 3A and Figure 3B
+
+This comparison keeps the same `polytroubles` logic for both Figure 3A and Figure 3B, and uses the same explicit combined classes and the same color scheme in both panels instead of alpha blending. That makes summed pressure, infectious hotspots, and overlap much easier to distinguish in a publication figure.
+
+```{r polytroubles-comparison}
+# fig3b_env <- new.env(parent = globalenv())
+# sys.source("6.5.comparison_maps.R", envir = fig3b_env)
+# 
+# fig3b_top5_presence_df <- get("top5_presence_df", envir = fig3b_env)
+# fig3b_polytroubles_source <- get("fig3B_polytroubles_plot", envir = fig3b_env)
+
+make_polytroubles_plot <- function(sum_df, overlay_df, world_sf, crs_string, title_text, subtitle_text) {
+  overlay_class_df <- overlay_df %>%
+    dplyr::transmute(x, y, infectious_presence = 1L)
+
+  poly_df <- sum_df %>%
+    dplyr::select(x, y, sum_binary) %>%
+    dplyr::left_join(overlay_class_df, by = c("x", "y")) %>%
+    dplyr::mutate(
+      infectious_presence = tidyr::replace_na(infectious_presence, 0L),
+      poly_class = dplyr::case_when(
+        sum_binary == 2 & infectious_presence == 0L ~ "sum2",
+        sum_binary == 3 & infectious_presence == 0L ~ "sum3",
+        (is.na(sum_binary) | sum_binary < 2 | sum_binary > 3) & infectious_presence == 1L ~ "eid",
+        sum_binary == 2 & infectious_presence == 1L ~ "sum2_eid",
+        sum_binary == 3 & infectious_presence == 1L ~ "sum3_eid",
+        TRUE ~ NA_character_
+      ),
+      poly_class = factor(
+        poly_class,
+        levels = c("sum2", "sum3", "eid", "sum2_eid", "sum3_eid")
+      )
+    )
+
+  ggplot() +
+    geom_tile(
+      data = poly_df,
+      aes(x = x, y = y, fill = poly_class)
+    ) +
+    geom_sf(data = world_sf, fill = NA, color = "grey10", linewidth = 0.05) +
+    coord_sf(crs = st_crs(crs_string), expand = FALSE) +
+    scale_fill_manual(
+      values = c(
+        "sum2" = "#9ecae1",
+        "sum3" = "#3182bd",
+        "eid" = "#ffd54f",
+        "sum2_eid" = "#78c679",
+        "sum3_eid" = "#238443"
+      ),
+      na.value = "white",
+      name = "Map class",
+      labels = c(
+        "sum2" = "Summed pressure 2 only",
+        "sum3" = "Summed pressure 3 only",
+        "eid" = "Top 5% EID only",
+        "sum2_eid" = "Overlap: 2 + EID",
+        "sum3_eid" = "Overlap: 3 + EID"
+      )
+    ) +
+    labs(
+      title = title_text,
+      subtitle = subtitle_text,
+      caption = "White cells indicate summed-binary classes 0, 1, 4, or NA with no highlighted overlap. Green classes show overlap.",
+      x = NULL,
+      y = NULL
+    ) +
+    theme_minimal(base_size = 11) +
+    theme(
+      panel.grid = element_blank(),
+      axis.text = element_blank(),
+      legend.position = "right",
+      legend.title = element_text(face = "bold"),
+      plot.title = element_text(face = "bold")
+    )
+}
+
+fig3a_polytroubles_plot <- make_polytroubles_plot(
+  sum_df = binary_sum_df,
+  overlay_df = fig3a_top5_presence_df,
+  world_sf = world_moll,
+  crs_string = target_crs,
+  title_text = "A. Figure 3A polytroubles",
+  subtitle_text = "Observed EID top 5%, summed pressure, and overlap shown as separate classes"
+)
+
+fig3b_polytroubles_plot <- fig3b_polytroubles_source +
+  labs(
+    title = "B. Figure 3B polytroubles",
+    subtitle = "Bias-corrected EID top 5%, summed pressure, and overlap shown as separate classes using the same palette as Figure 3A"
+  )
+
+grid::grid.newpage()
+grid::pushViewport(
+  grid::viewport(layout = grid::grid.layout(nrow = 1, ncol = 2))
+)
+print(fig3a_polytroubles_plot, vp = grid::viewport(layout.pos.row = 1, layout.pos.col = 1))
+print(fig3b_polytroubles_plot, vp = grid::viewport(layout.pos.row = 1, layout.pos.col = 2))
+
+pdf("6.6.fig3A_fig3B_polytroubles_comparison.pdf", width = 16, height = 6.5)
+grid::grid.newpage()
+grid::pushViewport(
+  grid::viewport(layout = grid::grid.layout(nrow = 1, ncol = 2))
+)
+print(fig3a_polytroubles_plot, vp = grid::viewport(layout.pos.row = 1, layout.pos.col = 1))
+print(fig3b_polytroubles_plot, vp = grid::viewport(layout.pos.row = 1, layout.pos.col = 2))
+dev.off()
+```

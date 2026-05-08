@@ -137,9 +137,9 @@ if (exists("world_moll", envir = sum_env, inherits = FALSE)) {
 binary_sum_df <- binary_sum_df %>%
   mutate(sum_binary_cat = factor(sum_binary, levels = c(0, 1, 2, 3, 4)))
 
-# ---- 2) source the infectious disease threshold workflow ----
+# ---- 2) source fig 3B- the infectious disease threshold workflow ----
 setwd("/Users/egepehlivanoglu/Library/CloudStorage/OneDrive-StockholmUniversity/KVA backup/KVAOneDrive_backup_28Jan2026/2. Projects/4.Cascades/Editorial Review 20250807/map/Anthropocene-maps/6.Infectious_diseases")
-source("6.2.Infectious_diseases.R")
+source("6.2.Alan_et.al_fig3B_reproduced.R")
 
 hist_df <- fig3b_df %>%
   dplyr::filter(!is.na(risk) & risk > 0)
@@ -203,7 +203,7 @@ fig3B_overlay_plot <- ggplot() +
   )
 fig3B_overlay_plot
 
-# ---- 4) figure 3B overlap-class plot ----
+# ---- 4) figure 3B polytroubles ----
 fig3b_overlay_class_df <- top5_presence_df %>%
   dplyr::transmute(x, y, infectious_presence = 1L)
 
