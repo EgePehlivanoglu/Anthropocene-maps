@@ -203,3 +203,66 @@ fig3B_overlay_plot <- ggplot() +
   )
 fig3B_overlay_plot
 
+# ---- 4) figure 3B overlap-class plot ----
+fig3b_overlay_class_df <- top5_presence_df %>%
+  dplyr::transmute(x, y, infectious_presence = 1L)
+
+fig3B_polytroubles_df <- binary_sum_df %>%
+  dplyr::select(x, y, sum_binary) %>%
+  dplyr::left_join(fig3b_overlay_class_df, by = c("x", "y")) %>%
+  dplyr::mutate(
+    infectious_presence = tidyr::replace_na(infectious_presence, 0L),
+    poly_class = dplyr::case_when(
+      sum_binary == 2 & infectious_presence == 0L ~ "sum2",
+      sum_binary == 3 & infectious_presence == 0L ~ "sum3",
+      (is.na(sum_binary) | sum_binary < 2 | sum_binary > 3) & infectious_presence == 1L ~ "eid",
+      sum_binary == 2 & infectious_presence == 1L ~ "sum2_eid",
+      sum_binary == 3 & infectious_presence == 1L ~ "sum3_eid",
+      TRUE ~ NA_character_
+    ),
+    poly_class = factor(
+      poly_class,
+      levels = c("sum2", "sum3", "eid", "sum2_eid", "sum3_eid")
+    )
+  )
+
+fig3B_polytroubles_plot <- ggplot() +
+  geom_tile(
+    data = fig3B_polytroubles_df,
+    aes(x = x, y = y, fill = poly_class)
+  ) +
+  geom_sf(data = world_moll, fill = NA, color = "grey10", linewidth = 0.05) +
+  coord_sf(crs = st_crs(target_crs), expand = FALSE) +
+  scale_fill_manual(
+    values = c(
+      "sum2" = "#9ecae1",
+      "sum3" = "#3182bd",
+      "eid" = "#ffd54f",
+      "sum2_eid" = "#78c679",
+      "sum3_eid" = "#238443"
+    ),
+    na.value = "white",
+    name = "Map class",
+    labels = c(
+      "sum2" = "Summed pressure 2 only",
+      "sum3" = "Summed pressure 3 only",
+      "eid" = "Top 5% EID only",
+      "sum2_eid" = "Overlap: 2 + EID",
+      "sum3_eid" = "Overlap: 3 + EID"
+    )
+  ) +
+  labs(
+    title = "Figure 3B polytroubles",
+    subtitle = "Bias-corrected EID top 5%, summed pressure, and overlap shown as separate classes",
+    caption = "White cells indicate summed-binary classes 0, 1, 4, or NA with no highlighted overlap. Green classes show overlap.",
+    x = NULL, y = NULL
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(
+    panel.grid = element_blank(),
+    axis.text = element_blank(),
+    legend.position = "right",
+    legend.title = element_text(face = "bold"),
+    plot.title = element_text(face = "bold")
+  )
+fig3B_polytroubles_plot

@@ -314,26 +314,36 @@ dev.off()
 
 # 8. Polytroubles Comparison for Figure 3A and Figure 3B
 
-This comparison keeps the same yellow infectious overlays, but only colors summed-binary classes `2` and `3`. Classes `0`, `1`, and `NA` are shown alike.
+This comparison keeps the same `polytroubles` logic for both Figure 3A and Figure 3B, and uses the same explicit combined classes and the same color scheme in both panels instead of alpha blending. That makes summed pressure, infectious hotspots, and overlap much easier to distinguish in a publication figure.
 
 ```{r polytroubles-comparison}
 fig3b_env <- new.env(parent = globalenv())
 sys.source("6.5.comparison_maps.R", envir = fig3b_env)
 
 fig3b_top5_presence_df <- get("top5_presence_df", envir = fig3b_env)
-fig3b_world_moll <- get("world_moll", envir = fig3b_env)
-fig3b_target_crs <- get("target_crs", envir = fig3b_env)
-fig3b_binary_sum_df <- get("binary_sum_df", envir = fig3b_env)
+fig3b_polytroubles_source <- get("fig3B_polytroubles_plot", envir = fig3b_env)
 
 make_polytroubles_plot <- function(sum_df, overlay_df, world_sf, crs_string, title_text, subtitle_text) {
+  overlay_class_df <- overlay_df %>%
+    dplyr::transmute(x, y, infectious_presence = 1L)
+
   poly_df <- sum_df %>%
+    dplyr::select(x, y, sum_binary) %>%
+    dplyr::left_join(overlay_class_df, by = c("x", "y")) %>%
     dplyr::mutate(
+      infectious_presence = tidyr::replace_na(infectious_presence, 0L),
       poly_class = dplyr::case_when(
-        sum_binary == 2 ~ "2",
-        sum_binary == 3 ~ "3",
+        sum_binary == 2 & infectious_presence == 0L ~ "sum2",
+        sum_binary == 3 & infectious_presence == 0L ~ "sum3",
+        (is.na(sum_binary) | sum_binary < 2 | sum_binary > 3) & infectious_presence == 1L ~ "eid",
+        sum_binary == 2 & infectious_presence == 1L ~ "sum2_eid",
+        sum_binary == 3 & infectious_presence == 1L ~ "sum3_eid",
         TRUE ~ NA_character_
       ),
-      poly_class = factor(poly_class, levels = c("2", "3"))
+      poly_class = factor(
+        poly_class,
+        levels = c("sum2", "sum3", "eid", "sum2_eid", "sum3_eid")
+      )
     )
 
   ggplot() +
@@ -341,26 +351,30 @@ make_polytroubles_plot <- function(sum_df, overlay_df, world_sf, crs_string, tit
       data = poly_df,
       aes(x = x, y = y, fill = poly_class)
     ) +
-    geom_tile(
-      data = overlay_df,
-      aes(x = x, y = y),
-      fill = "yellow",
-      alpha = 0.28
-    ) +
     geom_sf(data = world_sf, fill = NA, color = "grey10", linewidth = 0.05) +
     coord_sf(crs = st_crs(crs_string), expand = FALSE) +
     scale_fill_manual(
       values = c(
-        "2" = "#92b4d6",
-        "3" = "#477db3"
+        "sum2" = "#9ecae1",
+        "sum3" = "#3182bd",
+        "eid" = "#ffd54f",
+        "sum2_eid" = "#78c679",
+        "sum3_eid" = "#238443"
       ),
       na.value = "white",
-      name = "Summed\nbinary layers"
+      name = "Map class",
+      labels = c(
+        "sum2" = "Summed pressure 2 only",
+        "sum3" = "Summed pressure 3 only",
+        "eid" = "Top 5% EID only",
+        "sum2_eid" = "Overlap: 2 + EID",
+        "sum3_eid" = "Overlap: 3 + EID"
+      )
     ) +
     labs(
       title = title_text,
       subtitle = subtitle_text,
-      caption = "Only summed-binary classes 2 and 3 are colored; 0, 1, and NA are shown alike.",
+      caption = "White cells indicate summed-binary classes 0, 1, 4, or NA with no highlighted overlap. Green classes show overlap.",
       x = NULL,
       y = NULL
     ) +
@@ -380,17 +394,14 @@ fig3a_polytroubles_plot <- make_polytroubles_plot(
   world_sf = world_moll,
   crs_string = target_crs,
   title_text = "A. Figure 3A polytroubles",
-  subtitle_text = "Top 5% of observed EID risk over summed-binary classes 2 and 3"
+  subtitle_text = "Observed EID top 5%, summed pressure, and overlap shown as separate classes"
 )
 
-fig3b_polytroubles_plot <- make_polytroubles_plot(
-  sum_df = fig3b_binary_sum_df,
-  overlay_df = fig3b_top5_presence_df,
-  world_sf = fig3b_world_moll,
-  crs_string = fig3b_target_crs,
-  title_text = "B. Figure 3B polytroubles",
-  subtitle_text = "Top 5% of bias-corrected EID risk over summed-binary classes 2 and 3"
-)
+fig3b_polytroubles_plot <- fig3b_polytroubles_source +
+  labs(
+    title = "B. Figure 3B polytroubles",
+    subtitle = "Bias-corrected EID top 5%, summed pressure, and overlap shown as separate classes using the same palette as Figure 3A"
+  )
 
 grid::grid.newpage()
 grid::pushViewport(

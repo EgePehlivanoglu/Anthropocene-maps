@@ -37,10 +37,10 @@ template_raster <- function(df) {
   raster::raster(template_df)
 }
 
-# ---- 3) clip values to +/- 2.5 SD, as in the figure caption ----
+# ---- 3) clip values to 0 and +2.5 SD for visual scaling ----
 eid_mean <- mean(predictions$bsm_weight_pop, na.rm = TRUE)
 eid_sd <- sd(predictions$bsm_weight_pop, na.rm = TRUE)
-eid_lower <- eid_mean - 2.5 * eid_sd
+eid_lower <- 0
 eid_upper <- eid_mean + 2.5 * eid_sd
 
 predictions$bsm_weight_pop_clipped <- clip_at_sd(predictions$bsm_weight_pop, 2.5)
@@ -138,7 +138,7 @@ fig_3b_sd_plot <- ggplot() +
     guide = guide_colorbar(
       label = TRUE,
       label.position = "right",
-      title = "EID Risk Index\n(+/- 2.5 SD)"
+      title = "EID Risk Index\n(0 to +2.5 SD)"
     )
   ) +
   theme(
@@ -153,7 +153,7 @@ fig_3b_sd_plot <- ggplot() +
   ) +
   labs(
     title = "Figure 3B reproduction with explicit SD scaling",
-    subtitle = "Colour palette limited to 2.5 SD above and below the mean",
+    subtitle = "Colour palette anchored at 0 and limited to +2.5 SD above the mean",
     x = NULL, y = NULL
   )
 
