@@ -1,0 +1,61 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+Based on Allen 2017 paper
+From README on github:
+The file data/predictions.RData contains the output of the model. All variables are described in more depth in the paper.
+
+The columns lon and lat are WGS84 longitude and latitude. gridid is a grid cell identifier.
++ bsm_weight_pubs is the model’s output weighted with publications (“observed”).
++ bsm_weight_pop is the model’s output weighted with population (“bias factored out”).
++ bsm_response is the model’s output weighted with neither.
+The other columns are generally predictor variables used in the model.
+
+I used bsm_response on the data Peter suggested. But it produced figure 4. 
+
+However, on the metadata of the file I download bsm_response is described as:
+https://github.com/ecohealthalliance/hotspots2/blob/a27520e8d6fe1950cb4b88299efcd229e36135b9/inst/out/unbl_data/metadata.csv
+bsm_response: The binomial probability that a grid cell sampled at that location will contain an EID event as opposed to a background sample, when drawing equal numbers of absence and background samples weighted by reporting effort.
+
+```{r}
+# Repro map of zoonotic EID hotspots (Allen et al. 2017) in R
+# Packages
+pkgs <- c("terra","sf","rnaturalearth","rnaturalearthdata","tidyterra","ggplot2")
+invisible(lapply(setNames(pkgs, pkgs), function(p) if (!requireNamespace(p, quietly=TRUE)) install.packages(p)))
+library(terra); library(sf); library(rnaturalearth); library(tidyterra); library(ggplot2)
+
+# 1) Download authors' Zenodo archive with data/figures/code
+# (Allen et al. 2017 "hotspots2" v1.0r2)
+eid_risk_relative_to_reporting_effor <- read_csv("~/Library/CloudStorage/OneDrive-StockholmUniversity/KVA backup/KVAOneDrive_backup_28Jan2026/2. Projects/4.Cascades/Editorial Review 20250807/map/Anthropocene-maps/6.Infectious_diseases/eid_risk_relative_to_reporting_effor.csv")
+data <- eid_risk_relative_to_reporting_effor
+```
+
+#Figure 4
+
+```{r}
+# Land mask (so country borders are visible)
+land_sf     <- ne_countries(scale = "medium", returnclass = "sf") 
+
+ggplot() +
+  # geom_polygon(aes(x = lon, y = lat, group = group), data = map.world(), inherit.aes = FALSE, fill = viridis(1)) +
+  geom_raster(aes(x = lon, y = lat, fill = bsm_response), data = eid_risk_relative_to_reporting_effor) +
+   # geom_path(aes(x = lon, y = lat, group = group), data = map.world(), inherit.aes = FALSE, color = "white", size = 0.15) +
+  geom_sf(data =land_sf, fill = NA, color = "white", size = 0.15) +
+  #  coord_fixed() +
+  ylim(-65, 90) +
+  scale_fill_gradientn(colours = viridis(100),
+                       guide = guide_colorbar(label = TRUE,
+                                              label.position = "right",
+                                              title = "Event probability\n(relative to\nreporting effort)")) +
+#  theme_black_legend() +
+  theme(panel.background = element_rect(fill = "black"),
+        plot.background  = element_rect(fill = "black"),
+        line = element_blank(),
+        legend.title = element_text(color = "white", size = 8),
+        legend.text = element_text(color = "white", size = 8),
+        legend.title.align = 0,
+        legend.background = element_blank(),
+        legend.position = c(0.11, 0.45)) +
+  labs(x = NULL, y = NULL)
+```
