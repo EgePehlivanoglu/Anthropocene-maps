@@ -1,7 +1,9 @@
-# HISTOGRAMS AND THRESHOLD MAPS
+# HISTOGRAMS AND THRESHOLD MAPS For FIG 3B
+#We have decided to continue with 5% threshold. 
+
 ## for fig 3B reproduction
 setwd(dir = "/Users/egepehlivanoglu/Library/CloudStorage/OneDrive-StockholmUniversity/KVA backup/KVAOneDrive_backup_28Jan2026/2. Projects/4.Cascades/Editorial Review 20250807/map/Anthropocene-maps/6.Infectious_diseases")
-source("6.2.Infectious_diseases.R")
+source("6.2.Alan_et.al_fig3B_reproduced.R")
 
 if (!requireNamespace("shiny", quietly = TRUE)) {
   install.packages("shiny", repos = "https://cloud.r-project.org")
