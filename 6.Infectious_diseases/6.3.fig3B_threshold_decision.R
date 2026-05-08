@@ -1,5 +1,5 @@
 # HISTOGRAMS AND THRESHOLD MAPS For FIG 3B
-#We have decided to continue with 5% threshold. 
+# We have decided to continue with 5% threshold. 
 
 ## for fig 3B reproduction
 setwd(dir = "/Users/egepehlivanoglu/Library/CloudStorage/OneDrive-StockholmUniversity/KVA backup/KVAOneDrive_backup_28Jan2026/2. Projects/4.Cascades/Editorial Review 20250807/map/Anthropocene-maps/6.Infectious_diseases")

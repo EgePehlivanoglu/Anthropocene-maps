@@ -8,7 +8,7 @@ output:
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
 setwd("/Users/egepehlivanoglu/Library/CloudStorage/OneDrive-StockholmUniversity/KVA backup/KVAOneDrive_backup_28Jan2026/2. Projects/4.Cascades/Editorial Review 20250807/map/Anthropocene-maps/6.Infectious_diseases")
-source("6.3.histograms.R")
+source("6.3.fig3B_threshold_decision.R")
 ```
 
 # Overview
@@ -43,7 +43,7 @@ threshold_map_plot(25)
 ```
 
 ```{r save}
-pdf("threshold_maps.pdf", width = 10, height = 6)
+pdf("6.4.output_threshold_maps.pdf", width = 10, height = 6)
 
 plot.new()
 text(0.05, 0.92, "Threshold Maps for Infectious Disease Risk", adj = c(0, 1), cex = 1.4, font = 2)
