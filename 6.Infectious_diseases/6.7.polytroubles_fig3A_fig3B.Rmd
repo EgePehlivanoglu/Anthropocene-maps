@@ -248,18 +248,158 @@ fig3B_polytroubles_plot
 # 6. Save Outputs
 
 ```{r save-output}
-ggplot2::ggsave(
-  filename = file.path("6.Infectious_diseases", "6.7.fig3B_polytroubles_yellow_green.png"),
-  plot = fig3B_polytroubles_plot,
-  width = 11,
-  height = 6.5,
-  dpi = 300
+# ggplot2::ggsave(
+#   filename = file.path("6.Infectious_diseases", "6.7.fig3B_polytroubles_yellow_green.png"),
+#   plot = fig3B_polytroubles_plot,
+#   width = 11,
+#   height = 6.5,
+#   dpi = 300
+# )
+# 
+# ggplot2::ggsave(
+#   filename = file.path("6.Infectious_diseases", "6.7.fig3B_polytroubles_yellow_green.pdf"),
+#   plot = fig3B_polytroubles_plot,
+#   width = 11,
+#   height = 6.5
+# )
+```
+
+# 7. Save Figure 3A and Figure 3B Side by Side
+
+```{r save-fig3a-fig3b-side-by-side}
+fig3a_rmd <- file.path(
+  project_root,
+  "6.Infectious_diseases",
+  "6.6.Infectious_diseases_fig3A_reproduced.Rmd"
+)
+stopifnot(file.exists(fig3a_rmd))
+
+fig3a_script <- tempfile(fileext = ".R")
+knitr::purl(
+  input = fig3a_rmd,
+  output = fig3a_script,
+  quiet = TRUE
 )
 
-ggplot2::ggsave(
-  filename = file.path("6.Infectious_diseases", "6.7.fig3B_polytroubles_yellow_green.pdf"),
-  plot = fig3B_polytroubles_plot,
-  width = 11,
+fig3a_env <- new.env(parent = globalenv())
+sys.source(fig3a_script, envir = fig3a_env)
+
+fig3a_df <- get("fig3a_df", envir = fig3a_env)
+
+fig3a_hist_df <- fig3a_df %>%
+  dplyr::filter(!is.na(risk), risk > 0)
+
+fig3a_top5_cutoff <- stats::quantile(
+  fig3a_hist_df$risk,
+  probs = 0.95,
+  na.rm = TRUE
+)
+
+fig3a_top5_df <- fig3a_hist_df %>%
+  dplyr::filter(risk >= fig3a_top5_cutoff)
+
+fig3a_top5_vect <- terra::vect(
+  fig3a_top5_df,
+  geom = c("x", "y"),
+  crs = "EPSG:4326"
+)
+
+fig3a_top5_vect_moll <- terra::project(fig3a_top5_vect, target_crs)
+
+fig3a_top5_raster <- terra::rasterize(
+  fig3a_top5_vect_moll,
+  common_template_raster,
+  field = "risk",
+  fun = "max"
+)
+names(fig3a_top5_raster) <- "risk"
+
+fig3a_top5_presence <- terra::ifel(is.na(fig3a_top5_raster), NA, 1)
+names(fig3a_top5_presence) <- "presence"
+
+fig3a_top5_presence_df <- as.data.frame(
+  fig3a_top5_presence,
+  xy = TRUE,
+  na.rm = TRUE
+)
+
+make_polytroubles_plot <- function(overlay_df, title_text, subtitle_text) {
+  overlay_class_df <- overlay_df %>%
+    dplyr::transmute(x, y, infectious_presence = 1L)
+
+  polytroubles_df <- binary_sum_df %>%
+    dplyr::select(x, y, sum_binary) %>%
+    dplyr::left_join(overlay_class_df, by = c("x", "y")) %>%
+    dplyr::mutate(
+      infectious_presence = tidyr::replace_na(infectious_presence, 0L),
+      poly_class = dplyr::case_when(
+        sum_binary == 2 & infectious_presence == 0L ~ "sum2",
+        sum_binary == 3 & infectious_presence == 0L ~ "sum3",
+        infectious_presence == 1L &
+          (is.na(sum_binary) | !(sum_binary %in% highlight_pressure_values)) ~ "eid",
+        sum_binary == 2 & infectious_presence == 1L ~ "sum2_eid",
+        sum_binary == 3 & infectious_presence == 1L ~ "sum3_eid",
+        TRUE ~ NA_character_
+      ),
+      poly_class = factor(
+        poly_class,
+        levels = c("sum2", "sum3", "eid", "sum2_eid", "sum3_eid")
+      )
+    )
+
+  ggplot() +
+    geom_tile(
+      data = polytroubles_df,
+      aes(x = x, y = y, fill = poly_class)
+    ) +
+    geom_sf(data = world_moll, fill = NA, color = "grey10", linewidth = 0.05) +
+    coord_sf(crs = sf::st_crs(target_crs), expand = FALSE) +
+    scale_fill_manual(
+      values = polytroubles_palette,
+      labels = polytroubles_labels,
+      drop = FALSE,
+      na.value = "white",
+      name = "Map class"
+    ) +
+    labs(
+      title = title_text,
+      subtitle = subtitle_text,
+      caption = "Yellow shows top 5% EID cells outside summed-pressure classes 2 and 3. Green shows overlap with summed-pressure classes 2 or 3.",
+      x = NULL,
+      y = NULL
+    ) +
+    theme_minimal(base_size = 11) +
+    theme(
+      panel.grid = element_blank(),
+      axis.text = element_blank(),
+      legend.position = "right",
+      legend.title = element_text(face = "bold"),
+      plot.title = element_text(face = "bold")
+    )
+}
+
+fig3A_polytroubles_plot <- make_polytroubles_plot(
+  overlay_df = fig3a_top5_presence_df,
+  title_text = "A. Figure 3A polytroubles",
+  subtitle_text = "Top 5% observed EID risk, summed pressure, and overlap shown as separate classes"
+)
+
+fig3B_polytroubles_export_plot <- fig3B_polytroubles_plot +
+  labs(
+    title = "B. Figure 3B polytroubles",
+    subtitle = "Top 5% bias-corrected EID risk, summed pressure, and overlap shown as separate classes"
+  )
+
+pdf(
+  file.path("6.Infectious_diseases", "6.7.fig3A_fig3B_polytroubles_yellow_green.pdf"),
+  width = 16,
   height = 6.5
 )
+grid::grid.newpage()
+grid::pushViewport(
+  grid::viewport(layout = grid::grid.layout(nrow = 1, ncol = 2))
+)
+print(fig3A_polytroubles_plot, vp = grid::viewport(layout.pos.row = 1, layout.pos.col = 1))
+print(fig3B_polytroubles_export_plot, vp = grid::viewport(layout.pos.row = 1, layout.pos.col = 2))
+dev.off()
 ```
