@@ -1,5 +1,5 @@
 ---
-title: "Figure 3B Polytroubles With Yellow and Green Classes"
+title: "Figure 3B Polycrises With Yellow and Green Classes"
 output:
   html_document:
     toc: true
@@ -28,8 +28,8 @@ librarian::shelf(
 
 # Purpose
 
-This notebook rebuilds the Figure 3B polytroubles map directly, using the same
-classification logic used for the Figure 3A polytroubles map.
+This notebook rebuilds the Figure 3B polycrises map directly, using the same
+classification logic used for the Figure 3A polycrises map.
 
 The key classes are:
 
@@ -196,12 +196,19 @@ if (length(eid_only_n) == 1 && eid_only_n == 0) {
 # 5. Plot Figure 3B Polytroubles
 
 ```{r plot-polytroubles, fig.width=11, fig.height=6.5}
-polytroubles_palette <- c(
-  "sum2" = "#9ecae1",
-  "sum3" = "#3182bd",
-  "eid" = "#ffd54f",
-  "sum2_eid" = "#78c679",
-  "sum3_eid" = "#238443"
+# polytroubles_palette <- c(
+#   "sum2" = "#9ecae1",
+#   "sum3" = "#3182bd",
+#   "eid" = "#ffd54f",
+#   "sum2_eid" = "#78c679",
+#   "sum3_eid" = "#238443"
+# )
+polytroubles_palette_RdYlBl <- c(
+  "sum2" = "#abd9e9",
+  "sum3" = "#2c7bb6",
+  "eid" = "#ffffbf",
+  "sum2_eid" = "#fdae61",
+  "sum3_eid" = "#d7191c"
 )
 
 polytroubles_labels <- c(
@@ -220,14 +227,14 @@ fig3B_polytroubles_plot <- ggplot() +
   geom_sf(data = world_moll, fill = NA, color = "grey10", linewidth = 0.05) +
   coord_sf(crs = sf::st_crs(target_crs), expand = FALSE) +
   scale_fill_manual(
-    values = polytroubles_palette,
+    values = polytroubles_palette_RdYlBl,
     labels = polytroubles_labels,
     drop = FALSE,
     na.value = "white",
     name = "Map class"
   ) +
   labs(
-    title = "Figure 3B polytroubles",
+    title = "Figure 3B polycrises",
     subtitle = "Top 5% bias-corrected EID risk, summed pressure, and overlap shown as separate classes",
     caption = "Yellow shows Figure 3B top 5% EID cells outside summed-pressure classes 2 and 3. Green shows overlap with summed-pressure classes 2 or 3.",
     x = NULL,
@@ -248,20 +255,20 @@ fig3B_polytroubles_plot
 # 6. Save Outputs
 
 ```{r save-output}
-# ggplot2::ggsave(
-#   filename = file.path("6.Infectious_diseases", "6.7.fig3B_polytroubles_yellow_green.png"),
-#   plot = fig3B_polytroubles_plot,
-#   width = 11,
-#   height = 6.5,
-#   dpi = 300
-# )
+ggplot2::ggsave(
+  filename = file.path("6.Infectious_diseases", "6.7.fig3B_polycrises_RdYlBl.png"),
+  plot = fig3B_polytroubles_plot,
+  width = 11,
+  height = 6.5,
+  dpi = 300
+)
 # 
-# ggplot2::ggsave(
-#   filename = file.path("6.Infectious_diseases", "6.7.fig3B_polytroubles_yellow_green.pdf"),
-#   plot = fig3B_polytroubles_plot,
-#   width = 11,
-#   height = 6.5
-# )
+ggplot2::ggsave(
+  filename = file.path("6.Infectious_diseases", "6.7.fig3B_polycrises_RdYlBl.pdf"),
+  plot = fig3B_polytroubles_plot,
+  width = 11,
+  height = 6.5
+)
 ```
 
 # 7. Save Figure 3A and Figure 3B Side by Side
@@ -355,7 +362,7 @@ make_polytroubles_plot <- function(overlay_df, title_text, subtitle_text) {
     geom_sf(data = world_moll, fill = NA, color = "grey10", linewidth = 0.05) +
     coord_sf(crs = sf::st_crs(target_crs), expand = FALSE) +
     scale_fill_manual(
-      values = polytroubles_palette,
+      values = polytroubles_palette_RdYlBl,
       labels = polytroubles_labels,
       drop = FALSE,
       na.value = "white",
@@ -380,18 +387,18 @@ make_polytroubles_plot <- function(overlay_df, title_text, subtitle_text) {
 
 fig3A_polytroubles_plot <- make_polytroubles_plot(
   overlay_df = fig3a_top5_presence_df,
-  title_text = "A. Figure 3A polytroubles",
+  title_text = "A. Figure 3A polycrises",
   subtitle_text = "Top 5% observed EID risk, summed pressure, and overlap shown as separate classes"
 )
 
 fig3B_polytroubles_export_plot <- fig3B_polytroubles_plot +
   labs(
-    title = "B. Figure 3B polytroubles",
+    title = "B. Figure 3B polycrises",
     subtitle = "Top 5% bias-corrected EID risk, summed pressure, and overlap shown as separate classes"
   )
 
 pdf(
-  file.path("6.Infectious_diseases", "6.7.fig3A_fig3B_polytroubles_yellow_green.pdf"),
+  file.path("6.Infectious_diseases", "6.7.fig3A_fig3B_polycrises_RdYlBl.pdf"),
   width = 16,
   height = 6.5
 )
